@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import { FinishGood } from '../types';
 import { Plus, Search, Hammer, Pencil, Trash2, Box, Info, ArrowRight, CheckCircle, Printer, FileText, Download, X } from 'lucide-react';
 import { exportToExcel } from '../utils/exportExcel';
+import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 export const FinishGoodView: React.FC = () => {
   const { 
@@ -23,6 +25,8 @@ export const FinishGoodView: React.FC = () => {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printStartDate, setPrintStartDate] = useState('2026-08-01');
   const [printEndDate, setPrintEndDate] = useState('2026-08-31');
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FinishGood | null>(null);
 
   // General Form Modal state
   const [showFormModal, setShowFormModal] = useState(false);
@@ -114,9 +118,11 @@ export const FinishGoodView: React.FC = () => {
     setShowFormModal(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data tipe pallet ini dari gudang?')) {
-      deleteFinishGood(id);
+  const handleDeleteConfirm = () => {
+    if (deleteTarget) {
+      deleteFinishGood(deleteTarget.id);
+      showPdfToast(`Data tipe pallet "${deleteTarget.nama}" berhasil dihapus.`);
+      setDeleteTarget(null);
     }
   };
 
@@ -364,8 +370,8 @@ export const FinishGoodView: React.FC = () => {
                 )}
 
                 {/* Edit & Delete */}
-                {canModify && (
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1">
+                  {canModify && (
                     <button
                       id={`btn-edit-pallet-${item.id}`}
                       onClick={() => handleOpenEditModal(item)}
@@ -374,15 +380,15 @@ export const FinishGoodView: React.FC = () => {
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-500 cursor-pointer"
-                      title="Hapus"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => setDeleteTarget(item)}
+                    className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-500 cursor-pointer"
+                    title="Hapus Pallet"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-500 hover:text-red-700" />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -736,34 +742,36 @@ export const FinishGoodView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                   <button
                     onClick={() => handleExportExcelStok(printStartDate, printEndDate)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    Unduh Excel
+                    Excel
                   </button>
                   <button
-                    onClick={handleTriggerPrint}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                    disabled={isDownloadingPdf}
+                    onClick={async () => {
+                      setIsDownloadingPdf(true);
+                      await downloadElementAsPdf('finishgood-print-area', `Laporan_Stok_Pallet_${printStartDate || 'all'}_sd_${printEndDate || 'all'}`);
+                      setIsDownloadingPdf(false);
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF'}
+                  </button>
+                  <button
+                    onClick={() => triggerPrintOrPdf('finishgood-print-area', `Laporan_Stok_Pallet_${printStartDate || 'all'}_sd_${printEndDate || 'all'}`)}
+                    className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                   >
                     <Printer className="h-3.5 w-3.5" />
-                    Cetak PDF / Print
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm("Apakah Anda yakin ingin membatalkan cetak laporan stok ini?")) {
-                        setShowPrintModal(false);
-                      }
-                    }}
-                    className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 hover:bg-red-200 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                  >
-                    Batal
+                    Print
                   </button>
                   <button
                     onClick={() => setShowPrintModal(false)}
-                    className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 rounded-lg text-xs font-bold cursor-pointer transition-all"
+                    className="px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 rounded-lg text-xs font-bold cursor-pointer transition-all"
                   >
                     Tutup
                   </button>
@@ -771,7 +779,7 @@ export const FinishGoodView: React.FC = () => {
               </div>
 
               {/* Printable sheet */}
-              <div id="print-area" className="p-8 md:p-12 bg-white text-black min-h-[800px] font-sans">
+              <div id="finishgood-print-area" className="p-8 md:p-12 bg-white text-black min-h-[800px] font-sans printable-sheet">
                 {/* Logo Letterhead */}
                 <div className="flex justify-between items-center border-b-4 border-zinc-800 pb-5 mb-8">
                   <div className="flex items-center gap-3">
@@ -877,10 +885,66 @@ export const FinishGoodView: React.FC = () => {
 
               </div>
 
+              {/* Sticky Bottom Action Bar (Non-Printable) */}
+              <div className="sticky bottom-0 z-20 bg-zinc-50 dark:bg-zinc-900 px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 print:hidden shadow-lg">
+                <div className="text-xs text-zinc-500 font-medium hidden sm:block">
+                  Laporan Stok Pallet: <strong className="text-zinc-800 dark:text-zinc-200">{printStartDate} s/d {printEndDate}</strong>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintModal(false)}
+                    className="px-4 sm:px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    Tutup / Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExportExcelStok(printStartDate, printEndDate)}
+                    className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  >
+                    <Download className="h-4 w-4" />
+                    Unduh Excel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDownloadingPdf}
+                    onClick={async () => {
+                      setIsDownloadingPdf(true);
+                      await downloadElementAsPdf('finishgood-print-area', `Laporan_Stok_Pallet_${printStartDate || 'all'}_sd_${printEndDate || 'all'}`);
+                      setIsDownloadingPdf(false);
+                    }}
+                    className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerPrintOrPdf('finishgood-print-area', `Laporan_Stok_Pallet_${printStartDate || 'all'}_sd_${printEndDate || 'all'}`)}
+                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Cetak (Print)
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
         );
       })()}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Data Tipe Pallet Kayu"
+        message="Apakah Anda yakin ingin menghapus data tipe pallet ini dari katalog gudang?"
+        itemName={deleteTarget ? `${deleteTarget.kode} - ${deleteTarget.nama} (Tipe: ${deleteTarget.tipe}, Stok: ${deleteTarget.stok} pcs)` : ''}
+      />
 
     </div>
   );

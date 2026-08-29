@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
-import { Menu, Sun, Moon, Bell, RefreshCw, TriangleAlert, Info } from 'lucide-react';
+import { Menu, Sun, Moon, Bell, RefreshCw, TriangleAlert, Info, Database, CheckCircle2 } from 'lucide-react';
 
 interface TopbarProps {
   activeTab: string;
@@ -9,7 +9,7 @@ interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ activeTab, setMobileOpen }) => {
-  const { currentUser, switchUser, darkMode, toggleDarkMode, materials, finishGoods, purchaseOrders } = useApp();
+  const { currentUser, switchUser, darkMode, toggleDarkMode, materials, finishGoods, purchaseOrders, isFirebaseConnected, syncStatus } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
 
@@ -27,9 +27,17 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setMobileOpen }) => {
       case 'DASHBOARD': return 'Dashboard Rekapan Pabrik';
       case 'STOK_MATERIAL': return 'Manajemen Stok Material Bahan Baku';
       case 'STOK_JADI': return 'Gudang Penyimpanan Pallet Selesai';
-      case 'PURCHASE_ORDERS': return 'Sistem Purchase Order & Invoice';
+      case 'PURCHASE_ORDERS': return 'Sistem Purchase Order & Transaksi';
       case 'SURAT_JALAN': return 'Ekspedisi & Surat Jalan Kirim';
-      case 'KEUANGAN': return 'Arus Kas Keuangan & Buku Besar';
+      case 'INVOICE_BILLING': return 'Billing & Cetak Invoice Pembayaran';
+      case 'LAPORAN_AR': return 'Laporan Piutang Usaha Pelanggan (AR)';
+      case 'LAPORAN_AP': return 'Laporan Hutang Usaha Supplier (AP)';
+      case 'KAS_KECIL': return 'Kas Kecil & Petty Cash Pabrik';
+      case 'BUKU_BANK': return 'Buku Bank Rekening & Mutasi Giro';
+      case 'LAPORAN_KEUANGAN': return 'Laporan Keuangan (Neraca & Laba Rugi)';
+      case 'ASET_DEPRESIASI': return 'Daftar Aktiva Tetap & Depresiasi';
+      case 'LAPORAN_PAJAK': return 'Laporan Pajak Masa (PPN & PPh)';
+      case 'KEUANGAN': return 'Buku Kas & Arus Kas Pabrik';
       default: return 'CV. Mustika Kayu Nusantara';
     }
   };
@@ -63,6 +71,20 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setMobileOpen }) => {
       {/* Right Area: Control Panel */}
       <div className="flex items-center gap-3 relative">
         
+        {/* Firebase Cloud Live Indicator */}
+        <div 
+          className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${
+            isFirebaseConnected 
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
+              : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300'
+          }`}
+          title="Status database Cloud Firestore terhubung secara real-time"
+        >
+          <Database className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span className="text-[11px] font-bold">Firebase Firestore</span>
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`}></span>
+        </div>
+
         {/* Quick Role Switcher (Best UX for Testing) */}
         <div className="relative">
           <button

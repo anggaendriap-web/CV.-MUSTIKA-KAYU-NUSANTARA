@@ -9,6 +9,14 @@ import { FinishGoodView } from './components/FinishGoodView';
 import { PurchaseOrderView } from './components/PurchaseOrderView';
 import { SuratJalanView } from './components/SuratJalanView';
 import { KeuanganView } from './components/KeuanganView';
+import { InvoiceBillingView } from './components/InvoiceBillingView';
+import { LaporanARView } from './components/LaporanARView';
+import { LaporanAPView } from './components/LaporanAPView';
+import { KasKecilView } from './components/KasKecilView';
+import { BukuBankView } from './components/BukuBankView';
+import { LaporanKeuanganView } from './components/LaporanKeuanganView';
+import { AsetDepresiasiView } from './components/AsetDepresiasiView';
+import { LaporanPajakView } from './components/LaporanPajakView';
 
 function AppContent() {
   const { currentUser, darkMode } = useApp();
@@ -32,9 +40,9 @@ function AppContent() {
       // Define tab access limitations to gracefully redirect if role changes
       if (role === 'FINANCE' && ['STOK_JADI', 'SURAT_JALAN'].includes(activeTab)) {
         setActiveTab('DASHBOARD');
-      } else if (role === 'WAREHOUSE' && ['PURCHASE_ORDERS', 'KEUANGAN'].includes(activeTab)) {
+      } else if (role === 'WAREHOUSE' && ['PURCHASE_ORDERS', 'KEUANGAN', 'INVOICE_BILLING', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab)) {
         setActiveTab('DASHBOARD');
-      } else if (role === 'ADMIN_SALES' && ['STOK_MATERIAL', 'KEUANGAN'].includes(activeTab)) {
+      } else if (role === 'ADMIN_SALES' && ['STOK_MATERIAL', 'KEUANGAN', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab)) {
         setActiveTab('DASHBOARD');
       }
     }
@@ -57,6 +65,22 @@ function AppContent() {
         return <PurchaseOrderView />;
       case 'SURAT_JALAN':
         return <SuratJalanView />;
+      case 'INVOICE_BILLING':
+        return <InvoiceBillingView />;
+      case 'LAPORAN_AR':
+        return <LaporanARView />;
+      case 'LAPORAN_AP':
+        return <LaporanAPView />;
+      case 'KAS_KECIL':
+        return <KasKecilView />;
+      case 'BUKU_BANK':
+        return <BukuBankView />;
+      case 'LAPORAN_KEUANGAN':
+        return <LaporanKeuanganView />;
+      case 'ASET_DEPRESIASI':
+        return <AsetDepresiasiView />;
+      case 'LAPORAN_PAJAK':
+        return <LaporanPajakView />;
       case 'KEUANGAN':
         return <KeuanganView />;
       default:
@@ -84,7 +108,7 @@ function AppContent() {
         <Topbar activeTab={activeTab} setMobileOpen={setMobileOpen} />
 
         {/* Scrollable Main View Content */}
-        <main className="flex-1 overflow-y-auto max-w-full">
+        <main className="flex-1 overflow-y-auto max-w-full p-4 md:p-8">
           {renderActiveView()}
         </main>
 

@@ -1,0 +1,190 @@
+{
+  "entities": {
+    "Material": {
+      "title": "Material Bahan Baku",
+      "description": "Data bahan baku kayu log, balok, papan, paku, dan kimia oven",
+      "type": "object",
+      "properties": {
+        "kode": { "type": "string" },
+        "nama": { "type": "string" },
+        "kategori": { "type": "string" },
+        "dimensi": { "type": "string" },
+        "stok": { "type": "number" },
+        "satuan": { "type": "string" },
+        "minStok": { "type": "number" },
+        "hargaSatuan": { "type": "number" },
+        "lokasi": { "type": "string" },
+        "supplierUtama": { "type": "string" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["kode", "nama", "kategori", "stok", "satuan"]
+    },
+    "FinishGood": {
+      "title": "Stok Pallet Selesai",
+      "description": "Data produk pallet kayu siap kirim dan WIP",
+      "type": "object",
+      "properties": {
+        "kode": { "type": "string" },
+        "nama": { "type": "string" },
+        "tipePallet": { "type": "string" },
+        "standarISPM": { "type": "boolean" },
+        "dimensi": { "type": "string" },
+        "kapasitasBeban": { "type": "string" },
+        "stok": { "type": "number" },
+        "stokBooking": { "type": "number" },
+        "minStok": { "type": "number" },
+        "hargaJual": { "type": "number" },
+        "hpp": { "type": "number" },
+        "lokasiGudang": { "type": "string" },
+        "statusQC": { "type": "string" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["kode", "nama", "tipePallet", "stok"]
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order & Transaksi",
+      "description": "Order pembelian pallet dari buyer atau PO pengadaan bahan baku",
+      "type": "object",
+      "properties": {
+        "nomorPO": { "type": "string" },
+        "tipe": { "type": "string" },
+        "namaPelanggan": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "deadlineKirim": { "type": "string" },
+        "status": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "pajakPPN": { "type": "number" },
+        "total": { "type": "number" },
+        "catatan": { "type": "string" },
+        "createdByUser": { "type": "string" }
+      },
+      "required": ["nomorPO", "tipe", "namaPelanggan", "tanggal", "status"]
+    },
+    "SuratJalan": {
+      "title": "Surat Jalan Ekspedisi",
+      "description": "Dokumen jalan pengiriman armada truk",
+      "type": "object",
+      "properties": {
+        "nomorSJ": { "type": "string" },
+        "nomorPO": { "type": "string" },
+        "namaCustomer": { "type": "string" },
+        "alamatTujuan": { "type": "string" },
+        "tanggalKirim": { "type": "string" },
+        "namaSopir": { "type": "string" },
+        "noPolisi": { "type": "string" },
+        "status": { "type": "string" },
+        "items": { "type": "array" },
+        "catatan": { "type": "string" },
+        "dibuatOleh": { "type": "string" }
+      },
+      "required": ["nomorSJ", "namaCustomer", "tanggalKirim", "status"]
+    },
+    "Invoice": {
+      "title": "Faktur Penagihan Invoice",
+      "description": "Invoice tagihan penjualan pallet",
+      "type": "object",
+      "properties": {
+        "nomorInvoice": { "type": "string" },
+        "nomorPO": { "type": "string" },
+        "nomorSJ": { "type": "string" },
+        "namaCustomer": { "type": "string" },
+        "alamat": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "jatuhTempo": { "type": "string" },
+        "syaratPembayaran": { "type": "string" },
+        "status": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "ppn": { "type": "number" },
+        "diskon": { "type": "number" },
+        "total": { "type": "number" },
+        "bankTujuan": { "type": "string" }
+      },
+      "required": ["nomorInvoice", "namaCustomer", "tanggal", "jatuhTempo", "total", "status"]
+    },
+    "KasKecil": {
+      "title": "Kas Kecil Petty Cash",
+      "description": "Pengeluaran harian kas kecil operasional",
+      "type": "object",
+      "properties": {
+        "nomorVoucher": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "kategori": { "type": "string" },
+        "tipe": { "type": "string" },
+        "nominal": { "type": "number" },
+        "deskripsi": { "type": "string" },
+        "penerima": { "type": "string" },
+        "disetujuiOleh": { "type": "string" }
+      },
+      "required": ["nomorVoucher", "tanggal", "kategori", "nominal", "tipe"]
+    },
+    "BukuBank": {
+      "title": "Buku Bank & Rekening",
+      "description": "Mutasi transaksi rekening bank perusahaan",
+      "type": "object",
+      "properties": {
+        "nomorReferensi": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "namaBank": { "type": "string" },
+        "tipe": { "type": "string" },
+        "nominal": { "type": "number" },
+        "lawanTransaksi": { "type": "string" },
+        "keterangan": { "type": "string" },
+        "saldoSetelah": { "type": "number" }
+      },
+      "required": ["nomorReferensi", "tanggal", "namaBank", "tipe", "nominal"]
+    },
+    "AktivaTetap": {
+      "title": "Aktiva Tetap & Depresiasi",
+      "description": "Aset mesin, oven, kendaraan & penyusutan",
+      "type": "object",
+      "properties": {
+        "kodeAset": { "type": "string" },
+        "namaAset": { "type": "string" },
+        "kategori": { "type": "string" },
+        "tanggalBeli": { "type": "string" },
+        "hargaPerolehan": { "type": "number" },
+        "nilaiResidu": { "type": "number" },
+        "masaManfaatTahun": { "type": "number" },
+        "akumulasiDepresiasi": { "type": "number" },
+        "nilaiBuku": { "type": "number" },
+        "lokasi": { "type": "string" },
+        "kondisi": { "type": "string" }
+      },
+      "required": ["kodeAset", "namaAset", "hargaPerolehan", "masaManfaatTahun"]
+    },
+    "PajakItem": {
+      "title": "Faktur Pajak Masa",
+      "description": "Rekapitulasi Faktur Pajak PPN & Bukti Potong PPh",
+      "type": "object",
+      "properties": {
+        "tanggal": { "type": "string" },
+        "jenisPajak": { "type": "string" },
+        "nomorFaktur": { "type": "string" },
+        "lawanTransaksi": { "type": "string" },
+        "dpp": { "type": "number" },
+        "tarifPersen": { "type": "number" },
+        "nominalPajak": { "type": "number" },
+        "statusBayarLapor": { "type": "string" },
+        "masaPajak": { "type": "string" }
+      },
+      "required": ["tanggal", "jenisPajak", "nomorFaktur", "nominalPajak"]
+    },
+    "ArusKasItem": {
+      "title": "Buku Kas & Arus Kas",
+      "description": "Pencatatan arus kas masuk/keluar pabrik",
+      "type": "object",
+      "properties": {
+        "tanggal": { "type": "string" },
+        "tipe": { "type": "string" },
+        "kategori": { "type": "string" },
+        "deskripsi": { "type": "string" },
+        "nominal": { "type": "number" },
+        "sumberKas": { "type": "string" },
+        "noReferensi": { "type": "string" }
+      },
+      "required": ["tanggal", "tipe", "kategori", "nominal"]
+    }
+  }
+}

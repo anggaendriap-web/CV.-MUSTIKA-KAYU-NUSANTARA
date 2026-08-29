@@ -4,6 +4,8 @@ import { SuratJalan, PurchaseOrder } from '../types';
 import { CompanyLogo } from './CompanyLogo';
 import { Plus, Search, Truck, Eye, Printer, Trash2, CheckCircle2, ChevronRight, User, Download, X } from 'lucide-react';
 import { exportToExcel } from '../utils/exportExcel';
+import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 export const SuratJalanView: React.FC = () => {
   const { 
@@ -27,6 +29,8 @@ export const SuratJalanView: React.FC = () => {
   // Detail/Kop Surat Modal State
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [viewingSJ, setViewingSJ] = useState<SuratJalan | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SuratJalan | null>(null);
 
   // Form Fields
   const [selectedPOId, setSelectedPOId] = useState('');
@@ -127,9 +131,11 @@ export const SuratJalanView: React.FC = () => {
     setShowStatusModal(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data Surat Jalan ini?')) {
-      deleteSuratJalan(id);
+  const handleDeleteConfirm = () => {
+    if (deleteTarget) {
+      deleteSuratJalan(deleteTarget.id);
+      showPdfToast(`Surat Jalan "${deleteTarget.nomorSuratJalan}" berhasil dihapus.`);
+      setDeleteTarget(null);
     }
   };
 
@@ -297,15 +303,13 @@ export const SuratJalanView: React.FC = () => {
                       )}
 
                       {/* Delete */}
-                      {canModify && (
-                        <button
-                          onClick={() => handleDelete(sj.id)}
-                          className="p-1.5 text-zinc-400 hover:text-red-650 rounded-lg cursor-pointer"
-                          title="Hapus"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setDeleteTarget(sj)}
+                        className="p-1.5 text-zinc-400 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg cursor-pointer transition-all"
+                        title="Hapus Surat Jalan"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                      </button>
 
                     </div>
                   </td>
@@ -539,23 +543,25 @@ export const SuratJalanView: React.FC = () => {
                   <span className="inline-block bg-yellow-100 text-yellow-800 text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-wider">REVIEW SEBELUM CETAK</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                 <button
-                  onClick={() => window.print()}
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('sj-print-area', `Surat_Jalan_${viewingSJ.nomorSuratJalan}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-md disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  onClick={() => triggerPrintOrPdf('sj-print-area', `Surat_Jalan_${viewingSJ.nomorSuratJalan}`)}
                   className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-md"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print / Cetak
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("Apakah Anda yakin ingin membatalkan proses cetak Surat Jalan ini?")) {
-                      setShowDetailModal(false);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 hover:bg-red-200 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                >
-                  Batalkan Cetak
                 </button>
                 <button
                   onClick={() => setShowDetailModal(false)}
@@ -567,7 +573,7 @@ export const SuratJalanView: React.FC = () => {
             </div>
 
             {/* Printable Area */}
-            <div id="print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px]">
+            <div id="sj-print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] printable-sheet">
               
               {/* Header Letterhead */}
               <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-5 mb-6">
@@ -667,9 +673,57 @@ export const SuratJalanView: React.FC = () => {
 
             </div>
 
+            {/* Sticky Bottom Action Bar (Non-Printable) */}
+            <div className="sticky bottom-0 z-20 bg-zinc-50 dark:bg-zinc-900 px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 print:hidden shadow-lg">
+              <div className="text-xs text-zinc-500 font-medium hidden sm:block">
+                Surat Jalan: <strong className="text-zinc-800 dark:text-zinc-200">{viewingSJ.nomorSuratJalan}</strong>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-4 sm:px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Tutup / Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('sj-print-area', `Surat_Jalan_${viewingSJ.nomorSuratJalan}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerPrintOrPdf('sj-print-area', `Surat_Jalan_${viewingSJ.nomorSuratJalan}`)}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  Cetak Surat Jalan (Print)
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Dokumen Surat Jalan"
+        message="Apakah Anda yakin ingin menghapus dokumen surat jalan ini dari riwayat pengiriman armada?"
+        itemName={deleteTarget ? `${deleteTarget.nomorSuratJalan} - Sopir: ${deleteTarget.namaSopir} (${deleteTarget.pelanggan})` : ''}
+      />
 
     </div>
   );

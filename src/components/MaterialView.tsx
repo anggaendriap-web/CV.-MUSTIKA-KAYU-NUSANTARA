@@ -4,6 +4,8 @@ import { Material } from '../types';
 import { Plus, Search, Filter, Pencil, Trash2, ShieldAlert, PlusCircle, MinusCircle, RefreshCcw, Printer, Download, X, FileText } from 'lucide-react';
 import { CompanyLogo } from './CompanyLogo';
 import { exportToExcel } from '../utils/exportExcel';
+import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 export const MaterialView: React.FC = () => {
   const { materials, addMaterial, updateMaterial, deleteMaterial, adjustMaterialStock, currentUser } = useApp();
@@ -16,6 +18,8 @@ export const MaterialView: React.FC = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
   
   // Form fields
   const [kode, setKode] = useState('');
@@ -117,9 +121,11 @@ export const MaterialView: React.FC = () => {
     setShowAdjustModal(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data material ini?')) {
-      deleteMaterial(id);
+  const handleDeleteConfirm = () => {
+    if (deleteTarget) {
+      deleteMaterial(deleteTarget.id);
+      showPdfToast(`Data material "${deleteTarget.nama}" berhasil dihapus.`);
+      setDeleteTarget(null);
     }
   };
 
@@ -302,15 +308,13 @@ export const MaterialView: React.FC = () => {
                         )}
 
                         {/* Delete Button */}
-                        {canModify && (
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all hover:text-red-600 dark:hover:text-red-500 cursor-pointer"
-                            title="Hapus"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setDeleteTarget(item)}
+                          className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
+                          title="Hapus Material"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                        </button>
 
                         {!canModify && (
                           <span className="text-[10px] text-zinc-400 dark:text-zinc-500 italic">Hanya Baca</span>
@@ -578,34 +582,36 @@ export const MaterialView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                 <button
                   onClick={handleExportExcelMaterials}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Unduh Excel
+                  Excel
                 </button>
                 <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('material-print-area', `Laporan_Stok_Bahan_Baku_${new Date().toISOString().slice(0, 10)}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF'}
+                </button>
+                <button
+                  onClick={() => triggerPrintOrPdf('material-print-area', `Laporan_Stok_Bahan_Baku_${new Date().toISOString().slice(0, 10)}`)}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  Print / Cetak PDF
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("Apakah Anda yakin ingin membatalkan cetak laporan stok material ini?")) {
-                      setShowPrintModal(false);
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 hover:bg-red-200 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                >
-                  Batal
+                  Print
                 </button>
                 <button
                   onClick={() => setShowPrintModal(false)}
-                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 rounded-lg text-xs font-bold cursor-pointer transition-all"
+                  className="px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 rounded-lg text-xs font-bold cursor-pointer transition-all"
                 >
                   Tutup
                 </button>
@@ -613,7 +619,7 @@ export const MaterialView: React.FC = () => {
             </div>
 
             {/* Printable Report Content */}
-            <div id="print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px]">
+            <div id="material-print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] printable-sheet">
               
               {/* Header Kop Surat */}
               <div className="flex justify-between items-start border-b border-zinc-300 pb-6 mb-8">
@@ -705,9 +711,65 @@ export const MaterialView: React.FC = () => {
 
             </div>
 
+            {/* Sticky Bottom Action Bar (Non-Printable) */}
+            <div className="sticky bottom-0 z-20 bg-zinc-50 dark:bg-zinc-900 px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 print:hidden shadow-lg">
+              <div className="text-xs text-zinc-500 font-medium hidden sm:block">
+                Laporan Stok Bahan Baku: <strong className="text-zinc-800 dark:text-zinc-200">{filteredMaterials.length} Jenis Kayu</strong>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowPrintModal(false)}
+                  className="px-4 sm:px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Tutup / Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcelMaterials}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  Unduh Excel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('material-print-area', `Laporan_Stok_Bahan_Baku_${new Date().toISOString().slice(0, 10)}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerPrintOrPdf('material-print-area', `Laporan_Stok_Bahan_Baku_${new Date().toISOString().slice(0, 10)}`)}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  Cetak (Print)
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Data Material Bahan Baku"
+        message="Apakah Anda yakin ingin menghapus data material ini dari sistem inventaris pabrik?"
+        itemName={deleteTarget ? `${deleteTarget.kode} - ${deleteTarget.nama} (Stok: ${deleteTarget.stok} ${deleteTarget.satuan})` : ''}
+      />
 
     </div>
   );

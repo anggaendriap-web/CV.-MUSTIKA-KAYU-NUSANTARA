@@ -10,6 +10,8 @@ import {
   Download, X
 } from 'lucide-react';
 import { exportToExcel } from '../utils/exportExcel';
+import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface FormItem {
   finishGoodId: string;
@@ -48,6 +50,11 @@ export const PurchaseOrderView: React.FC = () => {
   const [statusPOFilter, setStatusPOFilter] = useState<string>('SEMUA');
   const [statusInvoiceFilter, setStatusInvoiceFilter] = useState<string>('SEMUA');
 
+  // Delete modal states
+  const [deletePOItem, setDeletePOItem] = useState<PurchaseOrder | null>(null);
+  const [deleteCustItem, setDeleteCustItem] = useState<Customer | null>(null);
+  const [deleteMktItem, setDeleteMktItem] = useState<MarketingCommission | null>(null);
+
   // Modal forms triggers
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,6 +66,7 @@ export const PurchaseOrderView: React.FC = () => {
   // SPK Production Modal State
   const [showSPKModal, setShowSPKModal] = useState(false);
   const [viewingSPK, setViewingSPK] = useState<PurchaseOrder | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // Customer Modal States
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -305,9 +313,11 @@ export const PurchaseOrderView: React.FC = () => {
     setShowPaymentModal(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus data PO ini?')) {
-      deletePurchaseOrder(id);
+  const handleDeletePOConfirm = () => {
+    if (deletePOItem) {
+      deletePurchaseOrder(deletePOItem.id);
+      showPdfToast(`Purchase Order "${deletePOItem.nomorPO}" berhasil dihapus.`);
+      setDeletePOItem(null);
     }
   };
 
@@ -364,9 +374,11 @@ export const PurchaseOrderView: React.FC = () => {
     setShowCustomerModal(false);
   };
 
-  const handleCustDelete = (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus pelanggan ini dari database?')) {
-      deleteCustomer(id);
+  const handleDeleteCustConfirm = () => {
+    if (deleteCustItem) {
+      deleteCustomer(deleteCustItem.id);
+      showPdfToast(`Data pelanggan "${deleteCustItem.nama}" berhasil dihapus.`);
+      setDeleteCustItem(null);
     }
   };
 
@@ -407,9 +419,11 @@ export const PurchaseOrderView: React.FC = () => {
     setShowMarketingModal(false);
   };
 
-  const handleMktDelete = (id: string) => {
-    if (confirm('Hapus staf marketing ini dari database komisi?')) {
-      deleteMarketing(id);
+  const handleDeleteMktConfirm = () => {
+    if (deleteMktItem) {
+      deleteMarketing(deleteMktItem.id);
+      showPdfToast(`Data staf marketing "${deleteMktItem.namaMarketing}" berhasil dihapus.`);
+      setDeleteMktItem(null);
     }
   };
 
@@ -743,15 +757,13 @@ export const PurchaseOrderView: React.FC = () => {
                           )}
 
                           {/* Delete PO */}
-                          {canModifySales && (
-                            <button
-                              onClick={() => handleDelete(po.id)}
-                              className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-500 rounded-lg cursor-pointer"
-                              title="Hapus PO"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setDeletePOItem(po)}
+                            className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg cursor-pointer transition-all"
+                            title="Hapus PO"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                          </button>
 
                         </div>
                       </td>
@@ -835,8 +847,8 @@ export const PurchaseOrderView: React.FC = () => {
                   )}
                 </div>
 
-                {canModifySales && (
-                  <div className="flex gap-1">
+                <div className="flex gap-1">
+                  {canModifySales && (
                     <button
                       onClick={() => handleOpenEditCustModal(cust)}
                       className="p-1.5 text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-lg cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -844,15 +856,15 @@ export const PurchaseOrderView: React.FC = () => {
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => handleCustDelete(cust.id)}
-                      className="p-1.5 text-zinc-400 hover:text-red-650 rounded-lg cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                      title="Hapus Customer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => setDeleteCustItem(cust)}
+                    className="p-1.5 text-zinc-400 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg cursor-pointer"
+                    title="Hapus Customer"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -1037,11 +1049,11 @@ export const PurchaseOrderView: React.FC = () => {
                               <Edit2 className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => handleMktDelete(m.id)}
-                              className="p-1 text-zinc-400 hover:text-red-650 cursor-pointer"
-                              title="Hapus"
+                              onClick={() => setDeleteMktItem(m)}
+                              className="p-1 text-zinc-400 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg cursor-pointer"
+                              title="Hapus Staf Marketing"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
                             </button>
                           </div>
                         </td>
@@ -1557,23 +1569,25 @@ export const PurchaseOrderView: React.FC = () => {
                   <span className="inline-block bg-yellow-100 text-yellow-800 text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-wider">REVIEW SEBELUM CETAK</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                 <button
-                  onClick={() => window.print()}
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('invoice-print-area', `Invoice_${viewingPO.nomorInvoice || viewingPO.nomorPO}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-md disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  onClick={() => triggerPrintOrPdf('invoice-print-area', `Invoice_${viewingPO.nomorInvoice || viewingPO.nomorPO}`)}
                   className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-md"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print / Cetak
-                </button>
-                <button
-                  onClick={() => {
-                    if(confirm("Apakah Anda yakin ingin membatalkan proses cetak dokumen ini?")) {
-                      setShowDetailModal(false);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 hover:bg-red-200 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                >
-                  Batalkan Cetak
                 </button>
                 <button
                   onClick={() => setShowDetailModal(false)}
@@ -1585,7 +1599,7 @@ export const PurchaseOrderView: React.FC = () => {
             </div>
 
             {/* Invoice Printable Area */}
-            <div id="print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px]">
+            <div id="invoice-print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] printable-sheet">
               
               {/* Header */}
               <div className="flex justify-between items-start border-b border-zinc-200 pb-6 mb-8">
@@ -1709,6 +1723,44 @@ export const PurchaseOrderView: React.FC = () => {
 
             </div>
 
+            {/* Sticky Bottom Action Bar (Non-Printable) */}
+            <div className="sticky bottom-0 z-20 bg-zinc-50 dark:bg-zinc-900 px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 print:hidden shadow-lg">
+              <div className="text-xs text-zinc-500 font-medium hidden sm:block">
+                Dokumen: <strong className="text-zinc-800 dark:text-zinc-200">{viewingPO.nomorInvoice || viewingPO.nomorPO}</strong>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-4 sm:px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Tutup / Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('invoice-print-area', `Invoice_${viewingPO.nomorInvoice || viewingPO.nomorPO}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerPrintOrPdf('invoice-print-area', `Invoice_${viewingPO.nomorInvoice || viewingPO.nomorPO}`)}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  Cetak (Print)
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -1736,23 +1788,25 @@ export const PurchaseOrderView: React.FC = () => {
                   <span className="inline-block bg-yellow-100 text-yellow-800 text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-wider">REVIEW SEBELUM CETAK</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                 <button
-                  onClick={() => window.print()}
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('spk-print-area', `SPK_${viewingSPK.nomorJO || viewingSPK.nomorPO}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer transition-all shadow-md disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  onClick={() => triggerPrintOrPdf('spk-print-area', `SPK_${viewingSPK.nomorJO || viewingSPK.nomorPO}`)}
                   className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-md"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print / Cetak SPK
-                </button>
-                <button
-                  onClick={() => {
-                    if(confirm("Apakah Anda yakin ingin membatalkan proses cetak SPK ini?")) {
-                      setShowSPKModal(false);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 hover:bg-red-200 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                >
-                  Batalkan Cetak
                 </button>
                 <button
                   onClick={() => setShowSPKModal(false)}
@@ -1764,7 +1818,7 @@ export const PurchaseOrderView: React.FC = () => {
             </div>
 
             {/* SPK Printable Area */}
-            <div id="spk-print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] border-4 border-double border-zinc-400">
+            <div id="spk-print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] border-4 border-double border-zinc-400 printable-sheet">
               
               {/* Header */}
               <div className="flex justify-between items-start border-b border-zinc-300 pb-4 mb-6">
@@ -1859,6 +1913,44 @@ export const PurchaseOrderView: React.FC = () => {
 
             </div>
 
+            {/* Sticky Bottom Action Bar (Non-Printable) */}
+            <div className="sticky bottom-0 z-20 bg-zinc-50 dark:bg-zinc-900 px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 print:hidden shadow-lg">
+              <div className="text-xs text-zinc-500 font-medium hidden sm:block">
+                Surat Perintah Kerja: <strong className="text-zinc-800 dark:text-zinc-200">{viewingSPK.nomorJO || viewingSPK.nomorPO}</strong>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowSPKModal(false)}
+                  className="px-4 sm:px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Tutup / Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('spk-print-area', `SPK_${viewingSPK.nomorJO || viewingSPK.nomorPO}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerPrintOrPdf('spk-print-area', `SPK_${viewingSPK.nomorJO || viewingSPK.nomorPO}`)}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  Cetak SPK (Print)
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -1909,7 +2001,7 @@ export const PurchaseOrderView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
                 <button
                   onClick={() => {
                     exportToExcel<PurchaseOrder>(
@@ -1939,31 +2031,33 @@ export const PurchaseOrderView: React.FC = () => {
                       `Laporan_PO_Periode_${poStartDate}_sd_${poEndDate}`
                     );
                   }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Unduh Excel
+                  Excel
                 </button>
                 <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('po-report-print-area', `Laporan_PO_Periode_${poStartDate}_sd_${poEndDate}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF'}
+                </button>
+                <button
+                  onClick={() => triggerPrintOrPdf('po-report-print-area', `Laporan_PO_Periode_${poStartDate}_sd_${poEndDate}`)}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  Print / Cetak PDF
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("Apakah Anda yakin ingin membatalkan cetak laporan PO ini?")) {
-                      setShowPOPrintModal(false);
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 hover:bg-red-200 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                >
-                  Batal
+                  Print
                 </button>
                 <button
                   onClick={() => setShowPOPrintModal(false)}
-                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 rounded-lg text-xs font-bold cursor-pointer transition-all"
+                  className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 rounded-lg text-xs font-bold cursor-pointer transition-all"
                 >
                   Tutup
                 </button>
@@ -1974,12 +2068,12 @@ export const PurchaseOrderView: React.FC = () => {
             <div className="bg-blue-50 dark:bg-blue-950/20 px-6 py-2.5 border-b border-blue-100 dark:border-blue-900/30 text-blue-800 dark:text-blue-300 text-[11px] font-semibold flex items-center gap-2 print:hidden">
               <AlertCircle className="h-3.5 w-3.5 text-blue-500 shrink-0" />
               <span>
-                <strong>Tips Cetak PDF:</strong> Jika lembar cetak tidak merespon / tidak bisa menyimpan PDF, silakan klik tombol <strong>"Buka Aplikasi"</strong> (Tab Baru) di pojok kanan atas layar Anda, lalu cetak dengan lancar menggunakan <strong>Ctrl + P</strong> atau <strong>Cmd + P</strong>.
+                <strong>Tips Cetak PDF:</strong> Klik <strong>Unduh PDF</strong> untuk langsung menyimpan file PDF, atau gunakan <strong>Print</strong> untuk dialog cetak browser.
               </span>
             </div>
 
             {/* Printable Report Content */}
-            <div id="print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px]">
+            <div id="po-report-print-area" className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] printable-sheet">
               
               {/* Header Kop Surat */}
               <div className="flex justify-between items-start border-b border-zinc-300 pb-6 mb-8">
@@ -2110,9 +2204,110 @@ export const PurchaseOrderView: React.FC = () => {
 
             </div>
 
+            {/* Sticky Bottom Action Bar (Non-Printable) */}
+            <div className="sticky bottom-0 z-20 bg-zinc-50 dark:bg-zinc-900 px-6 py-3.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 print:hidden shadow-lg">
+              <div className="text-xs text-zinc-500 font-medium hidden sm:block">
+                Periode: <strong className="text-zinc-800 dark:text-zinc-200">{poStartDate} s/d {poEndDate}</strong>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => setShowPOPrintModal(false)}
+                  className="px-4 sm:px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Tutup / Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    exportToExcel<PurchaseOrder>(
+                      purchaseOrders.filter(t => {
+                        let ok = true;
+                        if (poStartDate) ok = ok && t.tanggal >= poStartDate;
+                        if (poEndDate) ok = ok && t.tanggal <= poEndDate;
+                        return ok;
+                      }),
+                      ['ID PO', 'Nomor PO', 'Nomor Invoice', 'Tanggal', 'Pelanggan', 'Sales Marketing', 'Tipe Pajak', 'Subtotal', 'PPN', 'PPh', 'Total Harga', 'Status PO', 'Status Invoice', 'Jatuh Tempo'],
+                      (po) => [
+                        po.id,
+                        po.nomorPO,
+                        po.nomorInvoice || '-',
+                        po.tanggal,
+                        po.pelanggan,
+                        po.namaMarketing || '-',
+                        po.tipePajak || 'Non PPN',
+                        po.subtotalHarga || po.totalHarga,
+                        po.ppnNominal || 0,
+                        po.pphNominal || 0,
+                        po.totalHarga,
+                        po.statusPO,
+                        po.statusInvoice,
+                        po.tanggalJatuhTempo || '-'
+                      ],
+                      `Laporan_PO_Periode_${poStartDate}_sd_${poEndDate}`
+                    );
+                  }}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  Unduh Excel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('po-report-print-area', `Laporan_PO_Periode_${poStartDate}_sd_${poEndDate}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => triggerPrintOrPdf('po-report-print-area', `Laporan_PO_Periode_${poStartDate}_sd_${poEndDate}`)}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  Cetak (Print)
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modals */}
+      <DeleteConfirmModal
+        isOpen={!!deletePOItem}
+        onClose={() => setDeletePOItem(null)}
+        onConfirm={handleDeletePOConfirm}
+        title="Hapus Data Purchase Order"
+        message="Apakah Anda yakin ingin menghapus Purchase Order ini dari sistem? Tindakan ini akan menghapus data order dan kalkulasi terkait."
+        itemName={deletePOItem ? `${deletePOItem.nomorPO} - ${deletePOItem.pelanggan} (Total: Rp ${deletePOItem.totalHarga.toLocaleString('id-ID')})` : ''}
+      />
+
+      <DeleteConfirmModal
+        isOpen={!!deleteCustItem}
+        onClose={() => setDeleteCustItem(null)}
+        onConfirm={handleDeleteCustConfirm}
+        title="Hapus Data Pelanggan"
+        message="Apakah Anda yakin ingin menghapus pelanggan ini dari database pelanggan?"
+        itemName={deleteCustItem ? `${deleteCustItem.nama} (${deleteCustItem.alamat})` : ''}
+      />
+
+      <DeleteConfirmModal
+        isOpen={!!deleteMktItem}
+        onClose={() => setDeleteMktItem(null)}
+        onConfirm={handleDeleteMktConfirm}
+        title="Hapus Staf Marketing"
+        message="Apakah Anda yakin ingin menghapus staf marketing ini dari daftar komisi?"
+        itemName={deleteMktItem ? `${deleteMktItem.namaMarketing} (Komisi: ${deleteMktItem.persentaseKomisi}%)` : ''}
+      />
 
     </div>
   );
