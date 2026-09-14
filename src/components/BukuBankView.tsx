@@ -23,7 +23,6 @@ export const BukuBankView: React.FC = () => {
   const { bukuBankList, addBukuBank, deleteBukuBank, currentUser } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [bankFilter, setBankFilter] = useState('Semua');
   const [jenisFilter, setJenisFilter] = useState<'Semua' | 'MASUK' | 'KELUAR'>('Semua');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -36,8 +35,8 @@ export const BukuBankView: React.FC = () => {
   // Form State
   const [formData, setFormData] = useState({
     tanggal: new Date().toISOString().split('T')[0],
-    bank: 'Bank BCA' as 'Bank BCA' | 'Bank Mandiri' | 'Bank Lainnya',
-    nomorRekening: '8820192831',
+    bank: 'Bank Mandiri',
+    nomorRekening: '156-00-1909954-0',
     jenis: 'MASUK' as 'MASUK' | 'KELUAR',
     kategori: 'Penerimaan Piutang Buyer',
     keterangan: '',
@@ -66,44 +65,38 @@ export const BukuBankView: React.FC = () => {
         item.kodeMutasi.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.referensi?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
 
-      const matchesBank = bankFilter === 'Semua' || item.bank === bankFilter;
-      const matchesJenis = jenisFilter === 'Semua' || item.jenis === jenisFilter;
+      const matchesJenis = jenisFilter === 'Semua' || item.jenis === jenisFilter || (jenisFilter === 'MASUK' && item.tipe === 'Masuk') || (jenisFilter === 'KELUAR' && item.tipe === 'Keluar');
 
       let matchesDate = true;
       if (startDate) matchesDate = matchesDate && item.tanggal >= startDate;
       if (endDate) matchesDate = matchesDate && item.tanggal <= endDate;
 
-      return matchesSearch && matchesBank && matchesJenis && matchesDate;
+      return matchesSearch && matchesJenis && matchesDate;
     });
-  }, [bukuBankList, searchTerm, bankFilter, jenisFilter, startDate, endDate]);
+  }, [bukuBankList, searchTerm, jenisFilter, startDate, endDate]);
 
-  // Bank Balances
-  const saldoBCA = useMemo(() => {
-    const masuk = bukuBankList.filter(b => b.bank === 'Bank BCA' && b.jenis === 'MASUK').reduce((a, b) => a + b.nominal, 0);
-    const keluar = bukuBankList.filter(b => b.bank === 'Bank BCA' && b.jenis === 'KELUAR').reduce((a, b) => a + b.nominal, 0);
+  // Bank Balances - Only Bank Mandiri
+  const totalSaldoBank = useMemo(() => {
+    const masuk = bukuBankList.filter(b => b.jenis === 'MASUK' || b.tipe === 'Masuk').reduce((a, b) => a + b.nominal, 0);
+    const keluar = bukuBankList.filter(b => b.jenis === 'KELUAR' || b.tipe === 'Keluar').reduce((a, b) => a + b.nominal, 0);
     return masuk - keluar;
   }, [bukuBankList]);
 
-  const saldoMandiri = useMemo(() => {
-    const masuk = bukuBankList.filter(b => b.bank === 'Bank Mandiri' && b.jenis === 'MASUK').reduce((a, b) => a + b.nominal, 0);
-    const keluar = bukuBankList.filter(b => b.bank === 'Bank Mandiri' && b.jenis === 'KELUAR').reduce((a, b) => a + b.nominal, 0);
-    return masuk - keluar;
+  const totalMasukKumulatif = useMemo(() => {
+    return bukuBankList.filter(b => b.jenis === 'MASUK' || b.tipe === 'Masuk').reduce((a, b) => a + b.nominal, 0);
   }, [bukuBankList]);
 
-  const totalSaldoBank = saldoBCA + saldoMandiri;
+  const totalKeluarKumulatif = useMemo(() => {
+    return bukuBankList.filter(b => b.jenis === 'KELUAR' || b.tipe === 'Keluar').reduce((a, b) => a + b.nominal, 0);
+  }, [bukuBankList]);
 
   const totalMasukPeriode = useMemo(() => {
-    return filteredList.filter(i => i.jenis === 'MASUK').reduce((a, b) => a + b.nominal, 0);
+    return filteredList.filter(i => i.jenis === 'MASUK' || i.tipe === 'Masuk').reduce((a, b) => a + b.nominal, 0);
   }, [filteredList]);
 
   const totalKeluarPeriode = useMemo(() => {
-    return filteredList.filter(i => i.jenis === 'KELUAR').reduce((a, b) => a + b.nominal, 0);
+    return filteredList.filter(i => i.jenis === 'KELUAR' || i.tipe === 'Keluar').reduce((a, b) => a + b.nominal, 0);
   }, [filteredList]);
-
-  const handleBankChange = (bank: 'Bank BCA' | 'Bank Mandiri' | 'Bank Lainnya') => {
-    const nomorRekening = bank === 'Bank BCA' ? '8820192831' : bank === 'Bank Mandiri' ? '1370092819201' : '000000000';
-    setFormData({ ...formData, bank, nomorRekening });
-  };
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,14 +107,18 @@ export const BukuBankView: React.FC = () => {
 
     addBukuBank({
       ...formData,
+      bank: 'Bank Mandiri',
+      nomorRekening: '156-00-1909954-0',
+      namaBank: 'Mandiri (156-00-1909954-0)',
+      tipe: formData.jenis === 'MASUK' ? 'Masuk' : 'Keluar',
       kodeMutasi: `BNK-${Math.floor(1000 + Math.random() * 9000)}`
     });
 
     setShowAddModal(false);
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
-      bank: 'Bank BCA',
-      nomorRekening: '8820192831',
+      bank: 'Bank Mandiri',
+      nomorRekening: '156-00-1909954-0',
       jenis: 'MASUK',
       kategori: 'Penerimaan Piutang Buyer',
       keterangan: '',
@@ -135,12 +132,12 @@ export const BukuBankView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 rounded-xl text-indigo-700 dark:text-indigo-400">
+          <div className="p-2.5 bg-amber-50 dark:bg-amber-950/50 rounded-xl text-amber-700 dark:text-amber-400">
             <Landmark className="h-6 w-6" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">Buku Bank (Bank Statement)</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Pencatatan mutasi rekening giro BCA & Mandiri, rekonsiliasi transfer, dan cetak rekening koran</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Rekening Giro Resmi: Bank Mandiri 156-00-1909954-0 a.n CV MUSTIKA KAYU NUSANTARA</p>
           </div>
         </div>
 
@@ -157,44 +154,44 @@ export const BukuBankView: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
           >
             <Printer className="h-4 w-4" />
-            <span>Cetak Buku Bank PDF</span>
+            <span>Cetak Rekening Koran PDF</span>
           </button>
         </div>
       </div>
 
       {/* Account Balance Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-amber-200 dark:border-amber-900/50 shadow-sm bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/20 dark:to-zinc-900">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Total Kas Bank</span>
-            <Landmark className="h-4 w-4 text-zinc-400" />
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Bank Mandiri (156-00-1909954-0)</span>
+            <Building className="h-4 w-4 text-amber-600" />
           </div>
           <div className="text-2xl font-black text-zinc-900 dark:text-white">{formatRupiah(totalSaldoBank)}</div>
-          <span className="text-xs text-zinc-400 mt-1 block">Gabungan Rekening Giro PT MKN</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 block font-medium">a.n CV MUSTIKA KAYU NUSANTARA</span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Bank BCA (882-019-2831)</span>
-            <Building className="h-4 w-4 text-blue-500" />
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Total Penerimaan (Debet)</span>
+            <ArrowDownLeft className="h-4 w-4 text-emerald-500" />
           </div>
-          <div className="text-2xl font-black text-blue-600 dark:text-blue-400">{formatRupiah(saldoBCA)}</div>
-          <span className="text-xs text-zinc-400 mt-1 block">Giro Operasional Utama</span>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatRupiah(totalMasukKumulatif)}</div>
+          <span className="text-xs text-zinc-400 mt-1 block">Akumulasi Masuk ke Rekening</span>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Bank Mandiri (137-00-9281920)</span>
-            <Building className="h-4 w-4 text-amber-500" />
+            <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Total Pengeluaran (Kredit)</span>
+            <ArrowUpRight className="h-4 w-4 text-red-500" />
           </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{formatRupiah(saldoMandiri)}</div>
-          <span className="text-xs text-zinc-400 mt-1 block">Giro Pembayaran & Pajak</span>
+          <div className="text-2xl font-black text-red-600 dark:text-red-400">{formatRupiah(totalKeluarKumulatif)}</div>
+          <span className="text-xs text-zinc-400 mt-1 block">Akumulasi Keluar dari Rekening</span>
         </div>
       </div>
 
       {/* Filter Bar */}
       <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             <input
@@ -207,16 +204,6 @@ export const BukuBankView: React.FC = () => {
           </div>
 
           <select
-            value={bankFilter}
-            onChange={(e) => setBankFilter(e.target.value)}
-            className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-600"
-          >
-            <option value="Semua">Semua Rekening Bank</option>
-            <option value="Bank BCA">Bank BCA</option>
-            <option value="Bank Mandiri">Bank Mandiri</option>
-          </select>
-
-          <select
             value={jenisFilter}
             onChange={(e) => setJenisFilter(e.target.value as any)}
             className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-600"
@@ -226,14 +213,26 @@ export const BukuBankView: React.FC = () => {
             <option value="KELUAR">Kredit / Keluar (Payment)</option>
           </select>
 
-          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-xl text-xs">
-            <Calendar className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-transparent border-none text-zinc-800 dark:text-zinc-200 focus:outline-none text-[11px] w-full"
-            />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-xl text-xs flex-1">
+              <Calendar className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent border-none text-zinc-800 dark:text-zinc-200 focus:outline-none text-[11px] w-full"
+              />
+            </div>
+            <span className="text-zinc-400 text-xs">s/d</span>
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-xl text-xs flex-1">
+              <Calendar className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent border-none text-zinc-800 dark:text-zinc-200 focus:outline-none text-[11px] w-full"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -272,14 +271,10 @@ export const BukuBankView: React.FC = () => {
                       <span className="text-[11px] text-zinc-400">{item.tanggal}</span>
                     </td>
                     <td className="p-3.5">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                        item.bank === 'Bank BCA'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                      }`}>
-                        {item.bank}
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        Bank Mandiri
                       </span>
-                      <span className="text-[10px] text-zinc-400 block mt-0.5">{item.nomorRekening}</span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">156-00-1909954-0</span>
                     </td>
                     <td className="p-3.5 font-medium text-zinc-700 dark:text-zinc-300">{item.kategori}</td>
                     <td className="p-3.5 text-zinc-800 dark:text-zinc-200 max-w-[280px]">
@@ -287,10 +282,10 @@ export const BukuBankView: React.FC = () => {
                       {item.referensi && <span className="text-[10px] text-zinc-400">Ref: {item.referensi}</span>}
                     </td>
                     <td className="p-3.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                      {item.jenis === 'MASUK' ? formatRupiah(item.nominal) : '-'}
+                      {item.jenis === 'MASUK' || item.tipe === 'Masuk' ? formatRupiah(item.nominal) : '-'}
                     </td>
                     <td className="p-3.5 text-right font-bold text-red-600 dark:text-red-400">
-                      {item.jenis === 'KELUAR' ? formatRupiah(item.nominal) : '-'}
+                      {item.jenis === 'KELUAR' || item.tipe === 'Keluar' ? formatRupiah(item.nominal) : '-'}
                     </td>
                     <td className="p-3.5 text-center">
                       <button
@@ -314,7 +309,7 @@ export const BukuBankView: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-black text-zinc-900 dark:text-white">Catat Mutasi Bank</h3>
+              <h3 className="text-lg font-black text-zinc-900 dark:text-white">Catat Mutasi Bank Mandiri</h3>
               <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-white">
                 <X className="h-5 w-5" />
               </button>
@@ -324,14 +319,9 @@ export const BukuBankView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Rekening Bank</label>
-                  <select
-                    value={formData.bank}
-                    onChange={(e) => handleBankChange(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white font-bold"
-                  >
-                    <option value="Bank BCA">Bank BCA (8820192831)</option>
-                    <option value="Bank Mandiri">Bank Mandiri (1370092819201)</option>
-                  </select>
+                  <div className="w-full px-3 py-2 bg-amber-50/50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl text-xs text-amber-900 dark:text-amber-200 font-bold">
+                    Mandiri 156-00-1909954-0
+                  </div>
                 </div>
                 <div>
                   <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Jenis Mutasi</label>
@@ -397,7 +387,7 @@ export const BukuBankView: React.FC = () => {
                 <label className="font-bold text-zinc-700 dark:text-zinc-300 block mb-1">Nomor Referensi Bank / Giro</label>
                 <input
                   type="text"
-                  placeholder="Contoh: REF-BCA-992812"
+                  placeholder="Contoh: REF-MND-992812"
                   value={formData.referensi}
                   onChange={(e) => setFormData({ ...formData, referensi: e.target.value })}
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
@@ -414,7 +404,7 @@ export const BukuBankView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-sm"
                 >
                   Simpan Mutasi
                 </button>
@@ -435,7 +425,7 @@ export const BukuBankView: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => triggerPrintOrPdf('bank-report-sheet', `Rekening_Koran_Bank_${startDate || 'all'}_sd_${endDate || 'all'}`)}
+                  onClick={() => triggerPrintOrPdf('bank-report-sheet', `Rekening_Koran_Mandiri_${startDate || 'all'}_sd_${endDate || 'all'}`)}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
                 >
                   <Download className="h-4 w-4" />
@@ -459,13 +449,14 @@ export const BukuBankView: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <CompanyLogo size="md" className="h-10 w-10" />
                     <div>
-                      <h2 className="text-lg font-black text-red-900">PT MUSTIKA KAYU NUSANTARA</h2>
+                      <h2 className="text-lg font-black text-red-900">CV MUSTIKA KAYU NUSANTARA</h2>
                       <p className="text-[10px] text-zinc-600">Laporan Rekening Koran & Mutasi Buku Bank Perusahaan</p>
                     </div>
                   </div>
                   <div className="text-right text-[10px] text-zinc-600">
                     <p><b>Periode:</b> {startDate || 'Awal'} s/d {endDate || 'Sekarang'}</p>
-                    <p><b>Rekening:</b> {bankFilter === 'Semua' ? 'Semua Rekening Bank' : bankFilter}</p>
+                    <p><b>Rekening:</b> Bank Mandiri 156-00-1909954-0</p>
+                    <p className="text-[9px] text-zinc-500">a.n CV MUSTIKA KAYU NUSANTARA</p>
                   </div>
                 </div>
 
@@ -479,8 +470,8 @@ export const BukuBankView: React.FC = () => {
                     <span className="font-extrabold text-red-700 text-sm">{formatRupiah(totalKeluarPeriode)}</span>
                   </div>
                   <div>
-                    <span className="text-indigo-700 block font-bold">Saldo Akhir Kumulatif:</span>
-                    <span className="font-extrabold text-indigo-700 text-sm">{formatRupiah(totalSaldoBank)}</span>
+                    <span className="text-amber-800 block font-bold">Saldo Akhir Kumulatif:</span>
+                    <span className="font-extrabold text-amber-800 text-sm">{formatRupiah(totalSaldoBank)}</span>
                   </div>
                 </div>
 
@@ -499,11 +490,11 @@ export const BukuBankView: React.FC = () => {
                     {filteredList.map((item, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
                         <td className="p-2 font-bold">{item.tanggal}<br/><span className="text-[9px] text-zinc-500 font-normal">{item.kodeMutasi}</span></td>
-                        <td className="p-2 font-semibold">{item.bank}</td>
+                        <td className="p-2 font-semibold">Bank Mandiri</td>
                         <td className="p-2 font-medium">{item.keterangan}</td>
                         <td className="p-2 text-zinc-500">{item.referensi || '-'}</td>
-                        <td className="p-2 text-right font-bold text-emerald-700">{item.jenis === 'MASUK' ? formatRupiah(item.nominal) : '-'}</td>
-                        <td className="p-2 text-right font-bold text-red-700">{item.jenis === 'KELUAR' ? formatRupiah(item.nominal) : '-'}</td>
+                        <td className="p-2 text-right font-bold text-emerald-700">{item.jenis === 'MASUK' || item.tipe === 'Masuk' ? formatRupiah(item.nominal) : '-'}</td>
+                        <td className="p-2 text-right font-bold text-red-700">{item.jenis === 'KELUAR' || item.tipe === 'Keluar' ? formatRupiah(item.nominal) : '-'}</td>
                       </tr>
                     ))}
                   </tbody>

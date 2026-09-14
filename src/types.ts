@@ -108,7 +108,7 @@ export interface Keuangan {
   keterangan: string;
   nominal: number;
   referensiId?: string; // e.g., Invoice ID or PO ID
-  metodePembayaran: 'Transfer Bank BCA' | 'Transfer Bank Mandiri' | 'Cash / Tunai';
+  metodePembayaran: 'Transfer Bank Mandiri' | 'Cash / Tunai' | string;
   pencatat: string; // Nama user
 }
 
@@ -148,13 +148,17 @@ export interface BukuBankItem {
   id: string;
   tanggal: string;
   kodeMutasi: string; // e.g. BNK-001
-  namaBank: 'BCA (8820192831)' | 'Mandiri (1370092819201)' | 'BRI (034101002341)';
-  tipe: 'Masuk' | 'Keluar';
-  kategori: 'Pelunasan Invoice' | 'DP Pembeli' | 'Bayar Supplier Kayu' | 'Gaji Tukang & Staf' | 'Pajak & Operasional' | 'Mutasi Kas Kecil';
+  namaBank?: string;
+  bank?: 'Bank Mandiri' | string;
+  nomorRekening?: string;
+  tipe?: 'Masuk' | 'Keluar';
+  jenis?: 'MASUK' | 'KELUAR';
+  kategori?: string;
   keterangan: string;
   nominal: number;
   saldoSetelahnya?: number;
   nomorReferensi?: string;
+  referensi?: string;
 }
 
 export interface AsetTetap {

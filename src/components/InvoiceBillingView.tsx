@@ -37,9 +37,10 @@ export const InvoiceBillingView: React.FC = () => {
   // Preview & Action Modals
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [previewMode, setPreviewMode] = useState<'single' | 'summary' | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [poToDelete, setPoToDelete] = useState<PurchaseOrder | null>(null);
   const [paymentModalPO, setPaymentModalPO] = useState<PurchaseOrder | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'Transfer Bank BCA' | 'Transfer Bank Mandiri' | 'Cash / Tunai'>('Transfer Bank BCA');
+  const [paymentMethod, setPaymentMethod] = useState<'Transfer Bank Mandiri' | 'Cash / Tunai'>('Transfer Bank Mandiri');
 
   // Set default dates on preset change
   const handlePresetChange = (preset: 'all' | 'this_month' | 'last_month' | 'custom') => {
@@ -413,143 +414,164 @@ export const InvoiceBillingView: React.FC = () => {
             <div className="p-4 bg-zinc-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Printer className="h-5 w-5 text-red-400" />
-                <span className="font-bold text-sm">Pratinjau Dokumen Invoice Penjualan</span>
+                <span className="font-bold text-sm">Pratinjau Faktur Invoice Penjualan</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => triggerPrintOrPdf('single-invoice-print-sheet', `Invoice_${selectedPO.nomorInvoice || selectedPO.nomorPO}`)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  disabled={isDownloadingPdf}
+                  onClick={async () => {
+                    setIsDownloadingPdf(true);
+                    await downloadElementAsPdf('single-invoice-print-sheet', `Invoice_${selectedPO.nomorInvoice || selectedPO.nomorPO}`);
+                    setIsDownloadingPdf(false);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-50 shadow-md"
                 >
-                  <Download className="h-4 w-4" />
-                  <span>Download / Print PDF</span>
+                  <Download className="h-3.5 w-3.5" />
+                  <span>{isDownloadingPdf ? 'Mengunduh...' : 'Unduh PDF (.pdf)'}</span>
+                </button>
+                <button
+                  onClick={() => triggerPrintOrPdf('single-invoice-print-sheet', `Invoice_${selectedPO.nomorInvoice || selectedPO.nomorPO}`)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-md"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span>Print / Cetak</span>
                 </button>
                 <button
                   onClick={() => { setPreviewMode(null); setSelectedPO(null); }}
                   className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Tutup"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {/* Printable Document Canvas */}
-            <div className="p-6 overflow-y-auto bg-zinc-100 dark:bg-zinc-950 flex justify-center">
+            {/* Printable Document Canvas - Exact match with Purchase Order invoice template */}
+            <div className="p-4 md:p-8 overflow-y-auto bg-zinc-100 dark:bg-zinc-950 flex justify-center">
               <div
                 id="single-invoice-print-sheet"
-                className="bg-white text-zinc-900 p-8 rounded-lg shadow-md max-w-2xl w-full text-xs font-sans border border-zinc-200"
-                style={{ minHeight: '280mm' }}
+                className="p-8 md:p-12 bg-white text-black font-sans min-h-[600px] printable-sheet max-w-3xl w-full rounded-lg shadow-md border border-zinc-200"
               >
-                {/* Official Letterhead */}
-                <div className="flex items-start justify-between border-b-2 border-red-900 pb-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <CompanyLogo size="md" className="h-12 w-12" />
+                {/* Header */}
+                <div className="flex justify-between items-start border-b border-zinc-200 pb-6 mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="p-1 bg-white border border-zinc-200 rounded-xl flex items-center justify-center shrink-0">
+                      <CompanyLogo size="md" className="h-14 w-14" />
+                    </div>
                     <div>
-                      <h2 className="text-xl font-black text-red-900 tracking-tight">PT MUSTIKA KAYU NUSANTARA</h2>
-                      <p className="text-[10px] text-zinc-600 font-medium">Produsen Pallet Kayu Standar Industri, Ekspor ISPM 15 & Custom</p>
-                      <p className="text-[9px] text-zinc-500 mt-0.5">Kawasan Industri Cikarang, Blok B-12, Bekasi | Telp: (021) 8901234 | Email: finance@mustikakayu.co.id</p>
+                      <h1 className="font-extrabold text-xl tracking-tight text-[#2E7D32]">CV. Mustika Kayu Nusantara</h1>
+                      <p className="text-xs font-bold text-zinc-900 mt-0.5">Supplier Kayu Olahan, Aneka Industri Kayu</p>
+                      <p className="text-[10px] text-zinc-600 mt-1 leading-relaxed">
+                        Alamat : Jl. Raya Mutiara Gading City, Pulo Kendal Ds. Setia Asih Rt.001/003 Kec. Tarumajaya<br />
+                        Kab. Bekasi Hp. 0812-8147-8689/0812-1060-3063, Email : mustikakayunusantara@gmail.com
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-lg font-black text-zinc-900 block">FAKTUR INVOICE</span>
-                    <span className="text-xs font-bold text-red-700 block font-mono">{selectedPO.nomorInvoice || `INV/MKN/2026/08/${selectedPO.id.slice(-3)}`}</span>
+                    <h2 className="text-2xl font-black text-zinc-800 uppercase tracking-tight">INVOICE</h2>
+                    <p className="text-xs font-mono font-bold text-red-750 mt-1">{selectedPO.nomorInvoice || (`INV/MKN/2026/08/${selectedPO.id.slice(-3)}`)}</p>
                     {selectedPO.nomorJO && (
-                      <span className="text-[11px] font-bold font-mono text-blue-700 block mt-0.5">
-                        No. JO: {selectedPO.nomorJO}
-                      </span>
+                      <p className="text-[11px] font-mono font-bold text-blue-700 mt-0.5">No. JO: {selectedPO.nomorJO}</p>
+                    )}
+                    <p className="text-[10px] text-zinc-500 mt-1">Tanggal: {selectedPO.tanggalOrder || selectedPO.tanggal}</p>
+                  </div>
+                </div>
+
+                {/* Addresses Block */}
+                <div className="grid grid-cols-2 gap-8 mb-8 text-xs">
+                  <div>
+                    <span className="block font-bold text-zinc-400 uppercase tracking-wider text-[9px] mb-1">DITAGIHKAN KEPADA:</span>
+                    <p className="font-extrabold text-sm text-zinc-800">{selectedPO.pelanggan}</p>
+                    <p className="text-zinc-500 mt-1">{selectedPO.tujuanPengiriman || 'Gudang Logistik & Penerimaan Pembelian'}</p>
+                    <p className="text-zinc-500 mt-0.5">Indonesia</p>
+                    {selectedPO.nomorJO && (
+                      <p className="text-zinc-900 mt-2 font-mono font-bold text-[10px]">No Job Order (JO): {selectedPO.nomorJO}</p>
                     )}
                   </div>
-                </div>
-
-                {/* Buyer & Order Details */}
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Ditagihkan Kepada:</span>
-                    <div className="font-extrabold text-sm text-zinc-900">{selectedPO.pelanggan}</div>
-                    <div className="text-[11px] text-zinc-600 mt-1">{selectedPO.tujuanPengiriman}</div>
-                  </div>
-                  <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200 space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-500 font-medium">Tanggal Faktur:</span>
-                      <span className="font-bold text-zinc-900">{selectedPO.tanggalOrder || selectedPO.tanggal}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-blue-50/80 px-2 py-0.5 rounded border border-blue-100">
-                      <span className="text-blue-900 font-extrabold text-[10px]">NOMOR JO (JOB ORDER):</span>
-                      <span className="font-mono font-bold text-blue-700 text-xs">{selectedPO.nomorJO || '-'}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-500 font-medium">Nomor PO Buyer:</span>
-                      <span className="font-bold text-zinc-900">{selectedPO.nomorPO}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-500 font-medium">Status Tagihan:</span>
-                      <span className={`font-bold ${selectedPO.statusInvoice === 'Lunas' ? 'text-emerald-700' : 'text-amber-700'}`}>
-                        {selectedPO.statusInvoice}
-                      </span>
-                    </div>
+                  <div className="text-right">
+                    <span className="block font-bold text-zinc-400 uppercase tracking-wider text-[9px] mb-1">METODE PEMBAYARAN:</span>
+                    <p className="font-bold text-zinc-800">Transfer Bank Mandiri</p>
+                    <p className="text-zinc-700 font-mono font-bold mt-0.5">No Rek Mandiri: 156-00-1909954-0</p>
+                    <p className="text-zinc-600 mt-0.5">a.n CV MUSTIKA KAYU NUSANTARA</p>
                   </div>
                 </div>
 
-                {/* Item List Table */}
-                <table className="w-full border-collapse mb-6">
+                {/* Items Table */}
+                <table className="w-full text-xs text-left border-collapse mb-8">
                   <thead>
-                    <tr className="bg-red-900 text-white font-bold text-[11px]">
-                      <th className="p-2.5 text-center w-10">No.</th>
-                      <th className="p-2.5 text-left">Deskripsi Produk Pallet</th>
-                      <th className="p-2.5 text-center w-20">Jumlah</th>
-                      <th className="p-2.5 text-right w-28">Harga Satuan</th>
-                      <th className="p-2.5 text-right w-32">Total Harga</th>
+                    <tr className="bg-zinc-100 border-b border-zinc-200">
+                      <th className="p-3 font-bold uppercase text-[10px]">Deskripsi Barang / Item Pekerjaan</th>
+                      <th className="p-3 text-center font-bold uppercase text-[10px]">Sertifikasi ISPM</th>
+                      <th className="p-3 text-right font-bold uppercase text-[10px]">Kuantitas</th>
+                      <th className="p-3 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
+                      <th className="p-3 text-right font-bold uppercase text-[10px]">Subtotal</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-200 border-b border-zinc-200">
+                  <tbody className="divide-y divide-zinc-200">
                     {selectedPO.item.map((item, idx) => (
                       <tr key={idx}>
-                        <td className="p-2.5 text-center text-zinc-500">{idx + 1}</td>
-                        <td className="p-2.5 font-bold text-zinc-800">{item.namaItem}</td>
-                        <td className="p-2.5 text-center font-bold">{item.jumlah} pcs</td>
-                        <td className="p-2.5 text-right">{formatRupiah(item.hargaSatuan)}</td>
-                        <td className="p-2.5 text-right font-bold">{formatRupiah(item.total)}</td>
+                        <td className="p-3">
+                          <p className="font-bold text-zinc-800">{item.namaPallet || (item as any).namaItem}</p>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Sertifikasi oven, anti-rayap terlapisi penuh</p>
+                        </td>
+                        <td className="p-3 text-center text-zinc-600 font-bold">{item.tipeIspm || 'Lokal'}</td>
+                        <td className="p-3 text-right font-bold">{item.jumlah} pcs</td>
+                        <td className="p-3 text-right">Rp {item.hargaSatuan.toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-right font-bold">Rp {(item.subtotal || (item as any).total || (item.jumlah * item.hargaSatuan)).toLocaleString('id-ID')}</td>
                       </tr>
                     ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={3} rowSpan={3} className="p-3 align-top bg-zinc-50 border-r border-zinc-200">
-                        <span className="font-bold text-zinc-700 block mb-1">Instruksi Pembayaran Transfer Bank:</span>
-                        <div className="text-[10px] text-zinc-600 space-y-0.5">
-                          <p>• <b>Bank BCA:</b> 882-019-2831 a/n PT Mustika Kayu Nusantara</p>
-                          <p>• <b>Bank Mandiri:</b> 137-00-9281920-1 a/n PT Mustika Kayu Nusantara</p>
-                          <p className="text-[9px] text-zinc-400 mt-1 italic">* Harap mencantumkan nomor invoice pada berita transfer.</p>
-                        </div>
+                    
+                    {/* Subtotal Neto, PPN, PPh breakdowns */}
+                    <tr className="border-t border-zinc-300">
+                      <td colSpan={3} className="p-2 text-right text-[10px] uppercase text-zinc-400 font-bold">Neto Sebelum Pajak:</td>
+                      <td colSpan={2} className="p-2 text-right font-mono text-zinc-800 font-bold">
+                        Rp {(selectedPO.subtotalHarga || selectedPO.item.reduce((acc, c) => acc + (c.subtotal || (c as any).total || (c.jumlah * c.hargaSatuan)), 0)).toLocaleString('id-ID')}
                       </td>
-                      <td className="p-2 text-right text-zinc-600 font-bold">Subtotal:</td>
-                      <td className="p-2 text-right font-bold text-zinc-900">{formatRupiah(selectedPO.totalHarga)}</td>
                     </tr>
-                    <tr>
-                      <td className="p-2 text-right text-zinc-600 font-bold">PPN (11% DPP):</td>
-                      <td className="p-2 text-right text-zinc-700">Sudah Termasuk PPN</td>
+
+                    {selectedPO.ppnNominal && selectedPO.ppnNominal > 0 ? (
+                      <tr>
+                        <td colSpan={3} className="p-2 text-right text-[10px] uppercase text-zinc-400 font-bold">PPN (11%):</td>
+                        <td colSpan={2} className="p-2 text-right font-mono text-emerald-600 font-bold">
+                          +Rp {selectedPO.ppnNominal.toLocaleString('id-ID')}
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {selectedPO.pphNominal && selectedPO.pphNominal > 0 ? (
+                      <tr>
+                        <td colSpan={3} className="p-2 text-right text-[10px] uppercase text-zinc-400 font-bold">PPh (2% Potongan):</td>
+                        <td colSpan={2} className="p-2 text-right font-mono text-red-500 font-bold">
+                          -Rp {selectedPO.pphNominal.toLocaleString('id-ID')}
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    <tr className="bg-zinc-50 font-bold border-t-2 border-zinc-300">
+                      <td colSpan={3} className="p-3 text-right text-[10px] uppercase text-zinc-900 font-extrabold">Jumlah Total Tagihan:</td>
+                      <td colSpan={2} className="p-3 text-right text-base text-red-800 font-extrabold font-mono">
+                        Rp {selectedPO.totalHarga.toLocaleString('id-ID')}
+                      </td>
                     </tr>
-                    <tr className="bg-zinc-100 font-black text-sm">
-                      <td className="p-2.5 text-right text-red-900">Total Tagihan:</td>
-                      <td className="p-2.5 text-right text-red-900">{formatRupiah(selectedPO.totalHarga)}</td>
-                    </tr>
-                  </tfoot>
+                  </tbody>
                 </table>
 
-                {/* Signatures & Stamp */}
-                <div className="grid grid-cols-2 gap-8 pt-8 mt-4 text-center">
+                {/* Footer Terms */}
+                <div className="border-t border-dashed border-zinc-250 pt-6 text-[10px] text-zinc-500 leading-relaxed grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-[10px] text-zinc-500 block mb-12">Penerima Tagihan / Customer,</span>
-                    <div className="border-t border-zinc-400 w-40 mx-auto pt-1 font-bold text-zinc-800">
-                      ( {selectedPO.pelanggan.slice(0, 20)} )
-                    </div>
+                    <p className="font-bold uppercase text-[9px] text-zinc-400 mb-1">KETENTUAN PEMBAYARAN:</p>
+                    <p>1. Invoice ini memiliki jatuh tempo pada tanggal: <span className="font-bold text-red-850">{selectedPO.tanggalJatuhTempo || '-'}</span>.</p>
+                    <p>2. Mohon cantumkan nomor invoice pada berita transfer bank Anda.</p>
+                    <p>3. Barang yang sudah dikirim dengan Surat Jalan resmi tidak dapat dibatalkan.</p>
                   </div>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block mb-12">Hormat Kami, PT Mustika Kayu Nusantara</span>
-                    <div className="border-t border-zinc-400 w-40 mx-auto pt-1 font-bold text-zinc-900">
-                      ( Bagian Keuangan / Finance )
-                    </div>
+                  <div className="text-center w-48 ml-auto">
+                    <p className="font-sans">Hormat Kami,</p>
+                    <div className="h-12"></div>
+                    <p className="font-bold underline">Staf Keuangan</p>
+                    <p className="text-[9px]">Bagian Finance & Kasir</p>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
@@ -588,12 +610,12 @@ export const InvoiceBillingView: React.FC = () => {
                 className="bg-white text-zinc-900 p-8 rounded-lg shadow-md max-w-3xl w-full text-xs font-sans border border-zinc-200"
               >
                 {/* Official Letterhead */}
-                <div className="flex items-start justify-between border-b-2 border-red-900 pb-4 mb-4">
+                <div className="flex items-start justify-between border-b border-zinc-250 pb-4 mb-4">
                   <div className="flex items-center gap-3">
                     <CompanyLogo size="md" className="h-10 w-10" />
                     <div>
-                      <h2 className="text-lg font-black text-red-900">PT MUSTIKA KAYU NUSANTARA</h2>
-                      <p className="text-[10px] text-zinc-600">Laporan Rekapitulasi Tagihan & Penerbitan Invoice</p>
+                      <h2 className="font-extrabold text-base tracking-tight text-[#2E7D32]">CV. Mustika Kayu Nusantara</h2>
+                      <p className="text-[10px] text-zinc-600">Supplier Kayu Olahan, Aneka Industri Kayu • Rekapitulasi Tagihan & Faktur Invoice</p>
                     </div>
                   </div>
                   <div className="text-right text-[10px] text-zinc-600">
@@ -689,8 +711,7 @@ export const InvoiceBillingView: React.FC = () => {
                 onChange={(e) => setPaymentMethod(e.target.value as any)}
                 className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-600"
               >
-                <option value="Transfer Bank BCA">Transfer Bank BCA (8820192831)</option>
-                <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (1370092819201)</option>
+                <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (156-00-1909954-0 - CV Mustika Kayu Nusantara)</option>
                 <option value="Cash / Tunai">Kas Tunai / Kasir Pabrik</option>
               </select>
             </div>

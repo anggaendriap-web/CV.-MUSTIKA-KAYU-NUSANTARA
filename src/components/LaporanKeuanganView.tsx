@@ -400,7 +400,7 @@ export const LaporanKeuanganView: React.FC = () => {
                       <span className="font-medium text-zinc-900 dark:text-white">{formatRupiah(kasKecil)}</span>
                     </div>
                     <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
-                      <span>Kas Bank (BCA & Mandiri)</span>
+                      <span>Kas Bank Mandiri (156-00-1909954-0)</span>
                       <span className="font-medium text-zinc-900 dark:text-white">{formatRupiah(kasBank)}</span>
                     </div>
                     <div className="flex justify-between text-zinc-600 dark:text-zinc-400">

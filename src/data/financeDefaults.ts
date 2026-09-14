@@ -14,7 +14,7 @@ export const DEFAULT_HUTANG_INIT: HutangUsaha[] = [
     sisaHutang: 25000000,
     status: 'Belum Lunas',
     riwayatBayar: [
-      { tanggal: '2026-08-06', nominal: 20000000, metode: 'Transfer Bank BCA', catatan: 'DP 44%' }
+      { tanggal: '2026-08-06', nominal: 20000000, metode: 'Transfer Bank Mandiri', catatan: 'DP 44%' }
     ]
   },
   {
@@ -30,7 +30,7 @@ export const DEFAULT_HUTANG_INIT: HutangUsaha[] = [
     sisaHutang: 0,
     status: 'Lunas',
     riwayatBayar: [
-      { tanggal: '2026-08-18', nominal: 8500000, metode: 'Transfer Bank BCA', catatan: 'Pelunasan faktur paku' }
+      { tanggal: '2026-08-18', nominal: 8500000, metode: 'Transfer Bank Mandiri', catatan: 'Pelunasan faktur paku' }
     ]
   },
   {
@@ -57,7 +57,7 @@ export const DEFAULT_KAS_KECIL_INIT: KasKecilItem[] = [
     tanggal: '2026-08-01',
     kode: 'KK-2026-08-001',
     kategori: 'Lainnya',
-    keterangan: 'Pengisian Plafon Awal Kas Kecil Operasional Pabrik dari Bank BCA',
+    keterangan: 'Pengisian Plafon Awal Kas Kecil Operasional Pabrik dari Bank Mandiri (156-00-1909954-0)',
     tipe: 'Masuk',
     nominal: 5000000,
     penerimaAtauPenyetor: 'Finance (Kasir Pabrik)'
@@ -118,56 +118,76 @@ export const DEFAULT_BUKU_BANK_INIT: BukuBankItem[] = [
   {
     id: 'bnk-1',
     tanggal: '2026-08-01',
-    kodeMutasi: 'MUT-BCA-001',
-    namaBank: 'BCA (8820192831)',
+    kodeMutasi: 'MUT-MND-001',
+    namaBank: 'Mandiri (156-00-1909954-0)',
+    bank: 'Bank Mandiri',
+    nomorRekening: '156-00-1909954-0',
     tipe: 'Masuk',
+    jenis: 'MASUK',
     kategori: 'Pelunasan Invoice',
     keterangan: 'Pelunasan Invoice INV/MKN/2026/08/101 dari PT Tirta Makmur',
     nominal: 45000000,
+    referensi: 'INV-101',
     nomorReferensi: 'INV-101'
   },
   {
     id: 'bnk-2',
     tanggal: '2026-08-06',
-    kodeMutasi: 'MUT-BCA-002',
-    namaBank: 'BCA (8820192831)',
+    kodeMutasi: 'MUT-MND-002',
+    namaBank: 'Mandiri (156-00-1909954-0)',
+    bank: 'Bank Mandiri',
+    nomorRekening: '156-00-1909954-0',
     tipe: 'Keluar',
+    jenis: 'KELUAR',
     kategori: 'Bayar Supplier Kayu',
     keterangan: 'DP Bahan Baku Kayu Log CV Sumber Rimba Makmur',
     nominal: 20000000,
+    referensi: 'AP-001',
     nomorReferensi: 'AP-001'
   },
   {
     id: 'bnk-3',
     tanggal: '2026-08-10',
-    kodeMutasi: 'MUT-MND-001',
-    namaBank: 'Mandiri (1370092819201)',
+    kodeMutasi: 'MUT-MND-003',
+    namaBank: 'Mandiri (156-00-1909954-0)',
+    bank: 'Bank Mandiri',
+    nomorRekening: '156-00-1909954-0',
     tipe: 'Masuk',
+    jenis: 'MASUK',
     kategori: 'DP Pembeli',
     keterangan: 'Uang Muka 50% Order Pallet Ekspor PT Astra Agro',
     nominal: 60000000,
+    referensi: 'PO-2026-004',
     nomorReferensi: 'PO-2026-004'
   },
   {
     id: 'bnk-4',
     tanggal: '2026-08-15',
-    kodeMutasi: 'MUT-BCA-003',
-    namaBank: 'BCA (8820192831)',
+    kodeMutasi: 'MUT-MND-004',
+    namaBank: 'Mandiri (156-00-1909954-0)',
+    bank: 'Bank Mandiri',
+    nomorRekening: '156-00-1909954-0',
     tipe: 'Keluar',
+    jenis: 'KELUAR',
     kategori: 'Gaji Tukang & Staf',
     keterangan: 'Payroll Gaji & Upah Borongan Tukang Pallet Periode I Agustus',
     nominal: 28500000,
+    referensi: 'PAYROLL-08A',
     nomorReferensi: 'PAYROLL-08A'
   },
   {
     id: 'bnk-5',
     tanggal: '2026-08-18',
-    kodeMutasi: 'MUT-MND-002',
-    namaBank: 'Mandiri (1370092819201)',
+    kodeMutasi: 'MUT-MND-005',
+    namaBank: 'Mandiri (156-00-1909954-0)',
+    bank: 'Bank Mandiri',
+    nomorRekening: '156-00-1909954-0',
     tipe: 'Keluar',
+    jenis: 'KELUAR',
     kategori: 'Pajak & Operasional',
     keterangan: 'Pembayaran Solar Industri Boiler Oven Kiln Dry & Genset',
     nominal: 14500000,
+    referensi: 'SLR-0818',
     nomorReferensi: 'SLR-0818'
   }
 ];

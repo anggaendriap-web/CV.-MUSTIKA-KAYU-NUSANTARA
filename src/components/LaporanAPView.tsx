@@ -50,7 +50,7 @@ export const LaporanAPView: React.FC = () => {
 
   // Pay Form State
   const [payNominal, setPayNominal] = useState(0);
-  const [payMetode, setPayMetode] = useState('Transfer Bank BCA');
+  const [payMetode, setPayMetode] = useState('Transfer Bank Mandiri');
   const [payCatatan, setPayCatatan] = useState('');
 
   // Initialize dates
@@ -489,8 +489,7 @@ export const LaporanAPView: React.FC = () => {
                   onChange={(e) => setPayMetode(e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
                 >
-                  <option value="Transfer Bank BCA">Transfer Bank BCA (8820192831)</option>
-                  <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (1370092819201)</option>
+                  <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (156-00-1909954-0 - CV Mustika Kayu Nusantara)</option>
                   <option value="Cash / Tunai">Kas Tunai Kasir Pabrik</option>
                 </select>
               </div>

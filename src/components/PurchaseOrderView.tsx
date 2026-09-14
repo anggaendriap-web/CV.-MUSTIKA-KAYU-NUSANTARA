@@ -103,7 +103,7 @@ export const PurchaseOrderView: React.FC = () => {
   // Payment Selection Modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payingPOId, setPayingPOId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'Transfer Bank BCA' | 'Transfer Bank Mandiri' | 'Cash / Tunai'>('Transfer Bank BCA');
+  const [paymentMethod, setPaymentMethod] = useState<'Transfer Bank Mandiri' | 'Cash / Tunai'>('Transfer Bank Mandiri');
 
   // State for Purchase Order report printing by period
   const [showPOPrintModal, setShowPOPrintModal] = useState(false);
@@ -322,7 +322,7 @@ export const PurchaseOrderView: React.FC = () => {
 
   const handleOpenPaymentModal = (poId: string) => {
     setPayingPOId(poId);
-    setPaymentMethod('Transfer Bank BCA');
+    setPaymentMethod('Transfer Bank Mandiri');
     setShowPaymentModal(true);
   };
 
@@ -1477,8 +1477,7 @@ export const PurchaseOrderView: React.FC = () => {
                   onChange={(e) => setPaymentMethod(e.target.value as any)}
                   className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-semibold focus:outline-none"
                 >
-                  <option value="Transfer Bank BCA">Transfer Bank BCA (CV Mustika)</option>
-                  <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (CV Mustika)</option>
+                  <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (156-00-1909954-0 - CV Mustika Kayu Nusantara)</option>
                   <option value="Cash / Tunai">Tunai / Cash Langsung</option>
                 </select>
               </div>
@@ -1758,9 +1757,9 @@ export const PurchaseOrderView: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <span className="block font-bold text-zinc-400 uppercase tracking-wider text-[9px] mb-1">METODE PEMBAYARAN:</span>
-                  <p className="font-semibold text-zinc-700">Transfer Bank Utama Mandiri / BCA</p>
-                  <p className="text-zinc-500 mt-0.5">No Rek Mandiri: 128-00-112233-4 (a.n CV. Mustika Kayu Nusantara)</p>
-                  <p className="text-zinc-500 mt-0.5">No Rek BCA: 012-345-6789 (a.n CV. Mustika Kayu Nusantara)</p>
+                  <p className="font-bold text-zinc-800">Transfer Bank Mandiri</p>
+                  <p className="text-zinc-700 font-mono font-bold mt-0.5">No Rek Mandiri: 156-00-1909954-0</p>
+                  <p className="text-zinc-600 mt-0.5">a.n CV MUSTIKA KAYU NUSANTARA</p>
                 </div>
               </div>
 
@@ -1831,9 +1830,6 @@ export const PurchaseOrderView: React.FC = () => {
                   <p>1. Invoice ini memiliki jatuh tempo pada tanggal: <span className="font-bold text-red-850">{viewingPO.tanggalJatuhTempo || '-'}</span>.</p>
                   <p>2. Mohon cantumkan nomor invoice pada berita transfer bank Anda.</p>
                   <p>3. Barang yang sudah dikirim dengan Surat Jalan resmi tidak dapat dibatalkan.</p>
-                  {viewingPO.namaMarketing && (
-                    <p className="mt-2 font-bold text-zinc-500">Staf Marketing Terkait: {viewingPO.namaMarketing}</p>
-                  )}
                 </div>
                 <div className="text-center w-48 ml-auto">
                   <p className="font-sans">Hormat Kami,</p>

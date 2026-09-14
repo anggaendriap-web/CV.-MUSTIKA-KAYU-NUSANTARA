@@ -765,7 +765,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedItem) syncToFirestore('purchase_orders', id, updatedItem);
   };
 
-  const updateInvoiceStatus = (id: string, status: PurchaseOrder['statusInvoice'], paymentMethod: Keuangan['metodePembayaran'] = 'Transfer Bank BCA') => {
+  const updateInvoiceStatus = (id: string, status: PurchaseOrder['statusInvoice'], paymentMethod: Keuangan['metodePembayaran'] = 'Transfer Bank Mandiri') => {
     const po = purchaseOrders.find(p => p.id === id);
     if (!po) return;
 
@@ -1048,7 +1048,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       kategori: 'Pembelian Material',
       nominal: nominalBayar,
       keterangan: `Pembayaran Tagihan AP ${target.nomorTagihan} - ${target.supplier}`,
-      metodePembayaran: metode.includes('BCA') ? 'Transfer Bank BCA' : metode.includes('Mandiri') ? 'Transfer Bank Mandiri' : 'Cash / Tunai',
+      metodePembayaran: (metode.includes('Cash') || metode.includes('Tunai')) ? 'Cash / Tunai' : 'Transfer Bank Mandiri',
       referensiId: target.nomorTagihan,
       pencatat: currentUser?.name || 'Sistem'
     };

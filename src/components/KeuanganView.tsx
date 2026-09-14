@@ -29,7 +29,7 @@ export const KeuanganView: React.FC = () => {
   const [kategori, setKategori] = useState<Keuangan['kategori']>('Penjualan Pallet');
   const [keterangan, setKeterangan] = useState('');
   const [nominal, setNominal] = useState(0);
-  const [metodePembayaran, setMetodePembayaran] = useState<Keuangan['metodePembayaran']>('Transfer Bank BCA');
+  const [metodePembayaran, setMetodePembayaran] = useState<Keuangan['metodePembayaran']>('Transfer Bank Mandiri');
 
   const categoriesList = [
     'Penjualan Pallet',
@@ -69,7 +69,7 @@ export const KeuanganView: React.FC = () => {
     setKategori('Penjualan Pallet');
     setKeterangan('');
     setNominal(0);
-    setMetodePembayaran('Transfer Bank BCA');
+    setMetodePembayaran('Transfer Bank Mandiri');
     setShowAddModal(true);
   };
 
@@ -403,8 +403,7 @@ export const KeuanganView: React.FC = () => {
                     onChange={(e) => setMetodePembayaran(e.target.value as any)}
                     className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs"
                   >
-                    <option value="Transfer Bank BCA">Transfer Bank BCA</option>
-                    <option value="Transfer Bank Mandiri">Transfer Bank Mandiri</option>
+                    <option value="Transfer Bank Mandiri">Transfer Bank Mandiri (156-00-1909954-0)</option>
                     <option value="Cash / Tunai">Cash / Tunai</option>
                   </select>
                 </div>
