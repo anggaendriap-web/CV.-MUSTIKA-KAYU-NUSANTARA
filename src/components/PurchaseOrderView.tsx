@@ -1240,7 +1240,7 @@ export const PurchaseOrderView: React.FC = () => {
                     list="customer-datalist"
                     placeholder="Ketik / Pilih nama perusahaan..."
                     value={pelanggan}
-                    onChange={(e) => setPelanggan(e.target.value)}
+                    onChange={(e) => handlePelangganChange(e.target.value)}
                     className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                   <datalist id="customer-datalist">
@@ -1451,20 +1451,47 @@ export const PurchaseOrderView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Due Date & Tax Selection */}
+              {/* Invoice Date, Payment Terms & Due Date */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-                <div className="space-y-1 col-span-1">
-                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">JATUH TEMPO BAYAR</label>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">TANGGAL CETAK/TERBIT INVOICE</label>
+                  <input
+                    type="date"
+                    required
+                    value={tanggalInvoice}
+                    onChange={(e) => handleTanggalInvoiceChange(e.target.value)}
+                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">SYARAT PEMBAYARAN (TOP)</label>
+                  <select
+                    value={syaratPembayaran}
+                    onChange={(e) => handleSyaratPembayaranChange(e.target.value as SyaratPembayaran)}
+                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-red-700 dark:text-red-400 cursor-pointer"
+                  >
+                    {PAYMENT_TERMS_OPTIONS.map(term => (
+                      <option key={term} value={term}>{term}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">JATUH TEMPO BAYAR (OTOMATIS)</label>
                   <input
                     type="date"
                     required
                     value={tanggalJatuhTempo}
                     onChange={(e) => setTanggalJatuhTempo(e.target.value)}
-                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs"
+                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono font-bold text-red-600"
                   />
                 </div>
+              </div>
 
-                <div className="space-y-1 col-span-1">
+              {/* Tax Selection & Special Notes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1">
                   <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">TIPE PERPAJAKAN</label>
                   <select
                     value={tipePajak}
@@ -1478,7 +1505,7 @@ export const PurchaseOrderView: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="space-y-1 col-span-1">
+                <div className="space-y-1">
                   <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">CATATAN KHUSUS</label>
                   <input
                     type="text"
@@ -1644,6 +1671,19 @@ export const PurchaseOrderView: React.FC = () => {
                   onChange={(e) => setCustEmail(e.target.value)}
                   className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase">Syarat Pembayaran Default (TOP)</label>
+                <select
+                  value={custSyaratPembayaran}
+                  onChange={(e) => setCustSyaratPembayaran(e.target.value as SyaratPembayaran)}
+                  className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-red-700 dark:text-red-400 cursor-pointer"
+                >
+                  {PAYMENT_TERMS_OPTIONS.map(term => (
+                    <option key={term} value={term}>{term}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-3 border-t border-zinc-100 dark:border-zinc-850 flex justify-end gap-2">
