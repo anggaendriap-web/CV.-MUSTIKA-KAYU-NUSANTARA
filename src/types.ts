@@ -35,12 +35,16 @@ export interface FinishGood {
   terakhirDiperbarui: string; // ISO Date
 }
 
+export type SyaratPembayaran = 'COD' | 'CBD' | 'Tempo 7 Hari' | 'Tempo 14 Hari' | 'Tempo 30 Hari';
+
 export interface PurchaseOrder {
   id: string;
   nomorPO: string; // e.g., PO-2026-001
   nomorJO?: string; // e.g., JO-2026-001
   nomorInvoice?: string; // e.g., INV-2026-001
-  tanggal: string;
+  tanggal: string; // Tanggal order / PO
+  tanggalInvoice?: string; // Tanggal cetak / terbit invoice
+  syaratPembayaran?: SyaratPembayaran; // COD, CBD, Tempo 7 Hari, Tempo 14 Hari, Tempo 30 Hari
   pelanggan: string;
   item: {
     finishGoodId?: string;
@@ -69,6 +73,7 @@ export interface Customer {
   telepon: string;
   email?: string;
   pic?: string;
+  syaratPembayaran?: SyaratPembayaran; // Default TOP customer: COD, CBD, Tempo 7 Hari, Tempo 14 Hari, Tempo 30 Hari
   createdAt: string;
 }
 

@@ -47,9 +47,14 @@
       "type": "object",
       "properties": {
         "nomorPO": { "type": "string" },
+        "nomorJO": { "type": "string" },
+        "nomorInvoice": { "type": "string" },
         "tipe": { "type": "string" },
         "namaPelanggan": { "type": "string" },
         "tanggal": { "type": "string" },
+        "tanggalInvoice": { "type": "string" },
+        "syaratPembayaran": { "type": "string", "enum": ["COD", "CBD", "Tempo 7 Hari", "Tempo 14 Hari", "Tempo 30 Hari"] },
+        "tanggalJatuhTempo": { "type": "string" },
         "deadlineKirim": { "type": "string" },
         "status": { "type": "string" },
         "items": { "type": "array" },
@@ -60,6 +65,21 @@
         "createdByUser": { "type": "string" }
       },
       "required": ["nomorPO", "tipe", "namaPelanggan", "tanggal", "status"]
+    },
+    "Customer": {
+      "title": "Data Pelanggan / Mitra",
+      "description": "Database mitra customer beserta kontak dan syarat pembayaran tempo",
+      "type": "object",
+      "properties": {
+        "nama": { "type": "string" },
+        "alamat": { "type": "string" },
+        "telepon": { "type": "string" },
+        "email": { "type": "string" },
+        "pic": { "type": "string" },
+        "syaratPembayaran": { "type": "string", "enum": ["COD", "CBD", "Tempo 7 Hari", "Tempo 14 Hari", "Tempo 30 Hari"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["nama", "alamat", "telepon"]
     },
     "SuratJalan": {
       "title": "Surat Jalan Ekspedisi",

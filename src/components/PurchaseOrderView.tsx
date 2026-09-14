@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { PurchaseOrder, FinishGood, Customer, MarketingCommission } from '../types';
+import { PurchaseOrder, FinishGood, Customer, MarketingCommission, SyaratPembayaran } from '../types';
 import { CompanyLogo } from './CompanyLogo';
 import { motion } from 'motion/react';
 import { 
@@ -12,6 +12,12 @@ import {
 import { exportToExcel } from '../utils/exportExcel';
 import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { 
+  PAYMENT_TERMS_OPTIONS, 
+  calculateDueDateFromInvoice, 
+  formatDateDisplay, 
+  getTermsBadgeColor 
+} from '../utils/paymentTerms';
 
 interface FormItem {
   finishGoodId: string;
@@ -76,6 +82,7 @@ export const PurchaseOrderView: React.FC = () => {
   const [custTelepon, setCustTelepon] = useState('');
   const [custEmail, setCustEmail] = useState('');
   const [custPic, setCustPic] = useState('');
+  const [custSyaratPembayaran, setCustSyaratPembayaran] = useState<SyaratPembayaran>('Tempo 30 Hari');
 
   // Marketing Modal States
   const [showMarketingModal, setShowMarketingModal] = useState(false);
@@ -90,10 +97,37 @@ export const PurchaseOrderView: React.FC = () => {
   const [nomorInvoice, setNomorInvoice] = useState('');
   const [pelanggan, setPelanggan] = useState('');
   const [tanggal, setTanggal] = useState('');
+  const [tanggalInvoice, setTanggalInvoice] = useState('');
+  const [syaratPembayaran, setSyaratPembayaran] = useState<SyaratPembayaran>('Tempo 30 Hari');
   const [catatan, setCatatan] = useState('');
   const [tanggalJatuhTempo, setTanggalJatuhTempo] = useState('');
   const [tipePajak, setTipePajak] = useState<'PPN' | 'Non PPN' | 'PPh' | 'PPN & PPh'>('Non PPN');
   const [namaMarketing, setNamaMarketing] = useState('');
+
+  // Auto-fill payment terms from customer selection
+  const handlePelangganChange = (selectedName: string) => {
+    setPelanggan(selectedName);
+    const matchedCust = customers.find(c => c.nama.toLowerCase().trim() === selectedName.toLowerCase().trim());
+    if (matchedCust && matchedCust.syaratPembayaran) {
+      setSyaratPembayaran(matchedCust.syaratPembayaran);
+      const baseDate = tanggalInvoice || tanggal || new Date().toISOString().split('T')[0];
+      const newDue = calculateDueDateFromInvoice(baseDate, matchedCust.syaratPembayaran);
+      setTanggalJatuhTempo(newDue);
+    }
+  };
+
+  const handleTanggalInvoiceChange = (newDate: string) => {
+    setTanggalInvoice(newDate);
+    const newDue = calculateDueDateFromInvoice(newDate, syaratPembayaran);
+    setTanggalJatuhTempo(newDue);
+  };
+
+  const handleSyaratPembayaranChange = (newTerm: SyaratPembayaran) => {
+    setSyaratPembayaran(newTerm);
+    const baseDate = tanggalInvoice || tanggal || new Date().toISOString().split('T')[0];
+    const newDue = calculateDueDateFromInvoice(baseDate, newTerm);
+    setTanggalJatuhTempo(newDue);
+  };
   
   // Dynamic PO Items form state
   const [formItems, setFormItems] = useState<FormItem[]>([
@@ -136,12 +170,16 @@ export const PurchaseOrderView: React.FC = () => {
   );
 
   const handleOpenAddModal = () => {
+    const today = new Date().toISOString().split('T')[0];
     setEditingId(null);
     setNomorPO('');
     setNomorJO('');
     setNomorInvoice(`INV/MKN/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`);
     setPelanggan('');
-    setTanggal(new Date().toISOString().split('T')[0]);
+    setTanggal(today);
+    setTanggalInvoice(today);
+    setSyaratPembayaran('Tempo 30 Hari');
+    setTanggalJatuhTempo(calculateDueDateFromInvoice(today, 'Tempo 30 Hari'));
     setCatatan('');
     setTipePajak('Non PPN');
     setNamaMarketing('');
@@ -151,20 +189,25 @@ export const PurchaseOrderView: React.FC = () => {
       { finishGoodId: '', namaItem: '', tipeIspm: 'Lokal', jumlah: 0, hargaSatuan: 0, subtotal: 0 }
     ]);
 
-    setTanggalJatuhTempo('');
     setShowFormModal(true);
   };
 
   // Open Edit PO Modal
   const handleOpenEditPOModal = (po: PurchaseOrder) => {
+    const today = new Date().toISOString().split('T')[0];
+    const invDate = po.tanggalInvoice || po.tanggal || today;
+    const term = po.syaratPembayaran || 'Tempo 30 Hari';
+
     setEditingId(po.id);
     setNomorPO(po.nomorPO);
     setNomorJO(po.nomorJO || `JO/MKN/2026/08/${Math.floor(100 + Math.random() * 900)}`);
     setNomorInvoice(po.nomorInvoice || `INV/MKN/2026/08/${Math.floor(100 + Math.random() * 900)}`);
     setPelanggan(po.pelanggan);
     setTanggal(po.tanggal);
+    setTanggalInvoice(invDate);
+    setSyaratPembayaran(term);
+    setTanggalJatuhTempo(po.tanggalJatuhTempo || calculateDueDateFromInvoice(invDate, term));
     setCatatan(po.catatan || '');
-    setTanggalJatuhTempo(po.tanggalJatuhTempo || '');
     setTipePajak(po.tipePajak || 'Non PPN');
     setNamaMarketing(po.namaMarketing || '');
     
@@ -277,6 +320,21 @@ export const PurchaseOrderView: React.FC = () => {
     }));
 
     const finalInvoiceNo = nomorInvoice.trim() || `INV/MKN/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
+    const finalInvDate = tanggalInvoice.trim() || tanggal || new Date().toISOString().split('T')[0];
+    const finalDueDate = tanggalJatuhTempo || calculateDueDateFromInvoice(finalInvDate, syaratPembayaran);
+
+    // Auto-save new customer to customer database if not exists yet
+    if (pelanggan.trim()) {
+      const existingCust = customers.find(c => c.nama.toLowerCase().trim() === pelanggan.toLowerCase().trim());
+      if (!existingCust) {
+        addCustomer({
+          nama: pelanggan.trim(),
+          alamat: 'Alamat operasional pelanggan',
+          telepon: '-',
+          syaratPembayaran: syaratPembayaran
+        });
+      }
+    }
 
     if (editingId) {
       updatePurchaseOrder(editingId, {
@@ -286,6 +344,9 @@ export const PurchaseOrderView: React.FC = () => {
         statusInvoice: 'Belum Bayar',
         pelanggan,
         tanggal,
+        tanggalInvoice: finalInvDate,
+        syaratPembayaran,
+        tanggalJatuhTempo: finalDueDate,
         item: itemsToSave,
         subtotalHarga: subtotal,
         tipePajak,
@@ -293,7 +354,6 @@ export const PurchaseOrderView: React.FC = () => {
         pphNominal: pph,
         totalHarga: total,
         namaMarketing,
-        tanggalJatuhTempo,
         catatan
       });
     } else {
@@ -302,6 +362,9 @@ export const PurchaseOrderView: React.FC = () => {
         nomorJO,
         nomorInvoice: finalInvoiceNo,
         tanggal,
+        tanggalInvoice: finalInvDate,
+        syaratPembayaran,
+        tanggalJatuhTempo: finalDueDate,
         pelanggan,
         item: itemsToSave,
         subtotalHarga: subtotal,
@@ -312,7 +375,6 @@ export const PurchaseOrderView: React.FC = () => {
         namaMarketing,
         statusPO: 'Diterima',
         statusInvoice: 'Belum Bayar',
-        tanggalJatuhTempo,
         catatan
       });
     }
@@ -342,8 +404,15 @@ export const PurchaseOrderView: React.FC = () => {
 
   const handleGenerateInvoice = (id: string) => {
     const invNum = `INV/MKN/2026/08/${Math.floor(100 + Math.random() * 900)}`;
+    const targetPO = purchaseOrders.find(p => p.id === id);
+    const today = new Date().toISOString().split('T')[0];
+    const terms = targetPO?.syaratPembayaran || 'Tempo 30 Hari';
+    const due = calculateDueDateFromInvoice(today, terms);
+
     updatePurchaseOrder(id, {
       nomorInvoice: invNum,
+      tanggalInvoice: today,
+      tanggalJatuhTempo: due,
       statusInvoice: 'Belum Bayar'
     });
   };
@@ -356,6 +425,7 @@ export const PurchaseOrderView: React.FC = () => {
     setCustTelepon('');
     setCustEmail('');
     setCustPic('');
+    setCustSyaratPembayaran('Tempo 30 Hari');
     setShowCustomerModal(true);
   };
 
@@ -366,6 +436,7 @@ export const PurchaseOrderView: React.FC = () => {
     setCustTelepon(c.telepon);
     setCustEmail(c.email || '');
     setCustPic(c.pic || '');
+    setCustSyaratPembayaran(c.syaratPembayaran || 'Tempo 30 Hari');
     setShowCustomerModal(true);
   };
 
@@ -379,7 +450,8 @@ export const PurchaseOrderView: React.FC = () => {
         alamat: custAlamat,
         telepon: custTelepon,
         email: custEmail,
-        pic: custPic
+        pic: custPic,
+        syaratPembayaran: custSyaratPembayaran
       });
     } else {
       addCustomer({
@@ -387,7 +459,8 @@ export const PurchaseOrderView: React.FC = () => {
         alamat: custAlamat,
         telepon: custTelepon,
         email: custEmail,
-        pic: custPic
+        pic: custPic,
+        syaratPembayaran: custSyaratPembayaran
       });
     }
     setShowCustomerModal(false);

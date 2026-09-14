@@ -23,6 +23,7 @@ import {
   DEFAULT_PAJAK_INIT
 } from '../data/financeDefaults';
 import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
+import { calculateDueDateFromInvoice } from '../utils/paymentTerms';
 
 interface AppContextProps {
   materials: Material[];
@@ -266,15 +267,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const unsubPOs = onSnapshot(collection(db, 'purchase_orders'), (snap) => {
         if (!snap.empty) {
           const rawList = snap.docs.map(d => d.data() as PurchaseOrder);
-          const list = rawList.map(po => ({
-            ...po,
-            nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
-              ? po.nomorInvoice
-              : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
-            statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
-              ? 'Belum Bayar'
-              : po.statusInvoice
-          }));
+          const list = rawList.map(po => {
+            const terms = po.syaratPembayaran || 'Tempo 30 Hari';
+            const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
+            const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
+              ? po.tanggalJatuhTempo
+              : calculateDueDateFromInvoice(invDate, terms);
+            return {
+              ...po,
+              nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+                ? po.nomorInvoice
+                : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+              syaratPembayaran: terms,
+              tanggalInvoice: invDate,
+              tanggalJatuhTempo: dueDate,
+              statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+                ? 'Belum Bayar'
+                : po.statusInvoice
+            };
+          });
           setPurchaseOrders(list);
           localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
         } else if (!isInitialSyncDone.current) {
@@ -282,15 +293,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (cached) {
             try {
               const rawList = JSON.parse(cached) as PurchaseOrder[];
-              const list = rawList.map(po => ({
-                ...po,
-                nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
-                  ? po.nomorInvoice
-                  : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
-                statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
-                  ? 'Belum Bayar'
-                  : po.statusInvoice
-              }));
+              const list = rawList.map(po => {
+                const terms = po.syaratPembayaran || 'Tempo 30 Hari';
+                const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
+                const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
+                  ? po.tanggalJatuhTempo
+                  : calculateDueDateFromInvoice(invDate, terms);
+                return {
+                  ...po,
+                  nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+                    ? po.nomorInvoice
+                    : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+                  syaratPembayaran: terms,
+                  tanggalInvoice: invDate,
+                  tanggalJatuhTempo: dueDate,
+                  statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+                    ? 'Belum Bayar'
+                    : po.statusInvoice
+                };
+              });
               setPurchaseOrders(list);
             } catch (e) {
               // ignore
@@ -719,10 +740,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const effectiveStatus = (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
       ? 'Belum Bayar'
       : po.statusInvoice;
+    const effectiveTerms = po.syaratPembayaran || 'Tempo 30 Hari';
+    const effectiveInvDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
+    const effectiveDueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
+      ? po.tanggalJatuhTempo
+      : calculateDueDateFromInvoice(effectiveInvDate, effectiveTerms);
+
     const newPO: PurchaseOrder = {
       ...po,
       nomorInvoice: generatedInv,
       statusInvoice: effectiveStatus,
+      syaratPembayaran: effectiveTerms,
+      tanggalInvoice: effectiveInvDate,
+      tanggalJatuhTempo: effectiveDueDate,
       id
     };
     const updated = [newPO, ...purchaseOrders];
@@ -734,9 +764,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let updatedItem: PurchaseOrder | null = null;
     const updated = purchaseOrders.map(item => {
       if (item.id === id) {
+        const effectiveTerms = po.syaratPembayaran || item.syaratPembayaran || 'Tempo 30 Hari';
+        const effectiveInvDate = po.tanggalInvoice || item.tanggalInvoice || po.tanggal || item.tanggal;
+        let effectiveDueDate = po.tanggalJatuhTempo || item.tanggalJatuhTempo;
+        // If terms or invoice date was changed without explicit new due date, re-calculate
+        if ((po.syaratPembayaran || po.tanggalInvoice) && !po.tanggalJatuhTempo) {
+          effectiveDueDate = calculateDueDateFromInvoice(effectiveInvDate, effectiveTerms);
+        }
         updatedItem = {
           ...item,
-          ...po
+          ...po,
+          syaratPembayaran: effectiveTerms,
+          tanggalInvoice: effectiveInvDate,
+          tanggalJatuhTempo: effectiveDueDate
         };
         return updatedItem;
       }
