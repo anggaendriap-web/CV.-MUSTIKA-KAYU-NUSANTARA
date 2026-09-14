@@ -508,7 +508,7 @@ export const InvoiceBillingView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200">
-                    {selectedPO.item.map((item, idx) => (
+                    {(selectedPO.item || []).map((item, idx) => (
                       <tr key={idx}>
                         <td className="p-3">
                           <p className="font-bold text-zinc-800">{item.namaPallet || (item as any).namaItem}</p>
@@ -525,7 +525,7 @@ export const InvoiceBillingView: React.FC = () => {
                     <tr className="border-t border-zinc-300">
                       <td colSpan={3} className="p-2 text-right text-[10px] uppercase text-zinc-400 font-bold">Neto Sebelum Pajak:</td>
                       <td colSpan={2} className="p-2 text-right font-mono text-zinc-800 font-bold">
-                        Rp {(selectedPO.subtotalHarga || selectedPO.item.reduce((acc, c) => acc + (c.subtotal || (c as any).total || (c.jumlah * c.hargaSatuan)), 0)).toLocaleString('id-ID')}
+                        Rp {(selectedPO.subtotalHarga || (selectedPO.item || []).reduce((acc, c) => acc + (c.subtotal || (c as any).total || (c.jumlah * c.hargaSatuan)), 0)).toLocaleString('id-ID')}
                       </td>
                     </tr>
 

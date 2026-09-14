@@ -20,7 +20,17 @@ import { LaporanPajakView } from './components/LaporanPajakView';
 
 function AppContent() {
   const { currentUser, darkMode } = useApp();
-  const [activeTab, setActiveTab] = useState<string>('DASHBOARD');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const cachedUser = localStorage.getItem('mk_current_user');
+    if (cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser);
+        if (user.role === 'WAREHOUSE') return 'STOK_JADI';
+        if (user.role === 'ADMIN_SALES') return 'PURCHASE_ORDERS';
+      } catch (e) {}
+    }
+    return 'DASHBOARD';
+  });
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
 
@@ -37,13 +47,13 @@ function AppContent() {
   useEffect(() => {
     if (currentUser) {
       const role = currentUser.role;
-      // Define tab access limitations to gracefully redirect if role changes
+      // Define tab access limitations to gracefully redirect if role changes or if DASHBOARD is accessed by WAREHOUSE/ADMIN_SALES
       if (role === 'FINANCE' && ['STOK_JADI', 'SURAT_JALAN'].includes(activeTab)) {
         setActiveTab('DASHBOARD');
-      } else if (role === 'WAREHOUSE' && ['PURCHASE_ORDERS', 'KEUANGAN', 'INVOICE_BILLING', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab)) {
-        setActiveTab('DASHBOARD');
-      } else if (role === 'ADMIN_SALES' && ['STOK_MATERIAL', 'KEUANGAN', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab)) {
-        setActiveTab('DASHBOARD');
+      } else if (role === 'WAREHOUSE' && (activeTab === 'DASHBOARD' || ['PURCHASE_ORDERS', 'KEUANGAN', 'INVOICE_BILLING', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab))) {
+        setActiveTab('STOK_JADI');
+      } else if (role === 'ADMIN_SALES' && (activeTab === 'DASHBOARD' || ['STOK_MATERIAL', 'KEUANGAN', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab))) {
+        setActiveTab('PURCHASE_ORDERS');
       }
     }
   }, [currentUser, activeTab]);

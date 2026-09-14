@@ -51,14 +51,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { currentUser, logout, isFirebaseConnected } = useApp();
 
   const navigationItems: NavItem[] = [
-    { id: 'DASHBOARD', label: 'Dashboard Rekapan', icon: LayoutDashboard, roles: ['OWNER', 'FINANCE', 'WAREHOUSE', 'ADMIN_SALES'] },
+    { id: 'DASHBOARD', label: 'Dashboard Rekapan', icon: LayoutDashboard, roles: ['OWNER', 'FINANCE'] },
     { id: 'STOK_MATERIAL', label: 'Stok Material', icon: TreePine, roles: ['OWNER', 'WAREHOUSE', 'FINANCE'], group: 'Operasional' },
     { id: 'STOK_JADI', label: 'Stok Finish Good', icon: Package, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES'], group: 'Operasional' },
     { id: 'PURCHASE_ORDERS', label: 'Purchase Orders', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
     { id: 'SURAT_JALAN', label: 'Surat Jalan Kirim', icon: Truck, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES'], group: 'Operasional' },
     
     // Modul Finance & Akuntansi
-    { id: 'INVOICE_BILLING', label: 'Cetak Invoice', icon: FileText, roles: ['OWNER', 'FINANCE', 'ADMIN_SALES'], group: 'Keuangan & Akuntansi' },
+    { id: 'INVOICE_BILLING', label: 'Cetak Invoice', icon: FileText, roles: ['OWNER', 'FINANCE'], group: 'Keuangan & Akuntansi' },
     { id: 'LAPORAN_AR', label: 'Laporan Piutang (AR)', icon: CreditCard, roles: ['OWNER', 'FINANCE'], group: 'Keuangan & Akuntansi' },
     { id: 'LAPORAN_AP', label: 'Laporan Hutang (AP)', icon: Building2, roles: ['OWNER', 'FINANCE'], group: 'Keuangan & Akuntansi' },
     { id: 'KAS_KECIL', label: 'Kas Kecil (Petty Cash)', icon: Coins, roles: ['OWNER', 'FINANCE'], group: 'Keuangan & Akuntansi' },

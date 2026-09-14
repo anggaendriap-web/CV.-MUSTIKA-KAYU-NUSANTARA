@@ -1888,7 +1888,7 @@ export const PurchaseOrderView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
-                  {viewingPO.item.map((item, idx) => (
+                  {(viewingPO.item || []).map((item, idx) => (
                     <tr key={idx}>
                       <td className="p-3">
                         <p className="font-bold text-zinc-800">{item.namaPallet}</p>
@@ -1905,7 +1905,7 @@ export const PurchaseOrderView: React.FC = () => {
                   <tr className="border-t border-zinc-300">
                     <td colSpan={3} className="p-2 text-right text-[10px] uppercase text-zinc-400 font-bold">Neto Sebelum Pajak:</td>
                     <td colSpan={2} className="p-2 text-right font-mono text-zinc-800 font-bold">
-                      Rp {(viewingPO.subtotalHarga || viewingPO.item.reduce((acc, c) => acc + c.subtotal, 0)).toLocaleString('id-ID')}
+                      Rp {(viewingPO.subtotalHarga || (viewingPO.item || []).reduce((acc, c) => acc + c.subtotal, 0)).toLocaleString('id-ID')}
                     </td>
                   </tr>
 

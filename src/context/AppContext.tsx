@@ -914,23 +914,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [newSJ, ...suratJalanList];
     saveSuratJalan(updated);
     syncToFirestore('surat_jalan', id, newSJ);
-
-    // Reduce FinishGood stocks upon shipment dispatch
-    const updatedGoods = finishGoods.map(fg => {
-      const sjItem = sj.itemKirim.find(i => i.namaPallet === fg.nama);
-      if (sjItem) {
-        const nextStock = Math.max(0, fg.stok - sjItem.jumlahKirim);
-        const item = {
-          ...fg,
-          stok: nextStock,
-          terakhirDiperbarui: new Date().toISOString()
-        };
-        syncToFirestore('finish_goods', item.id, item);
-        return item;
-      }
-      return fg;
-    });
-    saveFinishGoods(updatedGoods);
   };
 
   const updateSuratJalan = (id: string, sj: Partial<SuratJalan>) => {
@@ -953,7 +936,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSJStatus = (id: string, status: SuratJalan['statusPengiriman'], receiver?: string) => {
+    const sjTarget = suratJalanList.find(s => s.id === id);
+    if (!sjTarget) return;
+
+    const oldStatus = sjTarget.statusPengiriman;
     let updatedItem: SuratJalan | null = null;
+
     const updated = suratJalanList.map(sj => {
       if (sj.id === id) {
         updatedItem = {
@@ -967,6 +955,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     saveSuratJalan(updated);
     if (updatedItem) syncToFirestore('surat_jalan', id, updatedItem);
+
+    // If status changes from 'Draf' to shipped ('Dalam Perjalanan' or further), reduce Finish Good stock
+    if (oldStatus === 'Draf' && status !== 'Draf') {
+      const updatedGoods = finishGoods.map(fg => {
+        const sjItem = sjTarget.itemKirim.find(i => i.namaPallet === fg.nama);
+        if (sjItem) {
+          const nextStock = Math.max(0, fg.stok - sjItem.jumlahKirim);
+          const item = {
+            ...fg,
+            stok: nextStock,
+            terakhirDiperbarui: new Date().toISOString()
+          };
+          syncToFirestore('finish_goods', item.id, item);
+          return item;
+        }
+        return fg;
+      });
+      saveFinishGoods(updatedGoods);
+    }
   };
 
   // --- CRUD Keuangan ---
