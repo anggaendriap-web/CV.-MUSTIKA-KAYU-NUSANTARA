@@ -28,6 +28,7 @@ export const DashboardView: React.FC = () => {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [startDate, setStartDate] = useState('2026-08-01');
   const [endDate, setEndDate] = useState('2026-08-31');
+  const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   // Helper formatting currency
@@ -65,6 +66,42 @@ export const DashboardView: React.FC = () => {
   // 6. Stocks warning count
   const lowMaterials = materials.filter(m => m.stok <= m.minimalStok);
   const lowGoods = finishGoods.filter(g => g.stok <= g.minimalStok);
+
+  // --- MONTHLY TURNOVER BY PERIOD (YEAR) ---
+  const monthsData = [
+    { bulan: 'Jan', monthNum: '01' },
+    { bulan: 'Feb', monthNum: '02' },
+    { bulan: 'Mar', monthNum: '03' },
+    { bulan: 'Apr', monthNum: '04' },
+    { bulan: 'Mei', monthNum: '05' },
+    { bulan: 'Jun', monthNum: '06' },
+    { bulan: 'Jul', monthNum: '07' },
+    { bulan: 'Agu', monthNum: '08' },
+    { bulan: 'Sep', monthNum: '09' },
+    { bulan: 'Okt', monthNum: '10' },
+    { bulan: 'Nov', monthNum: '11' },
+    { bulan: 'Des', monthNum: '12' },
+  ].map(m => {
+    const matchingPOs = purchaseOrders.filter(po => {
+      if (po.statusPO === 'Dibatalkan') return false;
+      const dateStr = po.tanggalInvoice || po.tanggal || '';
+      return dateStr.startsWith(`${selectedYear}-${m.monthNum}`);
+    });
+    const paid = matchingPOs
+      .filter(po => po.statusInvoice === 'Lunas')
+      .reduce((acc, curr) => acc + curr.totalHarga, 0);
+    const unpaid = matchingPOs
+      .filter(po => po.statusInvoice !== 'Lunas')
+      .reduce((acc, curr) => acc + curr.totalHarga, 0);
+    return {
+      bulan: m.bulan,
+      paid,
+      unpaid,
+      total: paid + unpaid
+    };
+  });
+
+  const maxMonthVal = Math.max(10000000, ...monthsData.map(d => d.total));
 
   // --- SVG CHART DATA CALCULATIONS ---
   // Distribution of Pallets Sold (Count items in completed / active POs)
@@ -294,11 +331,23 @@ export const DashboardView: React.FC = () => {
                 <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100">Analitik Omset Penjualan Bulanan</h3>
                 <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Realisasi nominal invoice lunas & pending CV. Mustika Kayu Nusantara</p>
               </div>
-              <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-1 rounded">2026</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase">Periode Tahun:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="px-2.5 py-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 cursor-pointer focus:outline-none"
+                >
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                </select>
+              </div>
             </div>
 
             {/* Custom Interactive SVG Bar Chart */}
-            <div className="relative h-64 w-full flex items-end justify-between pt-6 px-4">
+            <div className="relative h-64 w-full flex items-end justify-between pt-6 px-2 overflow-x-auto">
               {/* Vertical Guide Lines */}
               <div className="absolute inset-x-0 bottom-0 h-[220px] flex flex-col justify-between pointer-events-none">
                 {[1, 2, 3, 4].map((idx) => (
@@ -306,33 +355,26 @@ export const DashboardView: React.FC = () => {
                 ))}
               </div>
 
-              {/* Monthly Bar Pillars */}
-              {[
-                { bulan: 'Mei', paid: 12000000, unpaid: 3000000 },
-                { bulan: 'Jun', paid: 24000000, unpaid: 4000000 },
-                { bulan: 'Jul', paid: 35000000, unpaid: 10000000 },
-                { bulan: 'Agu', paid: totalInvoicesTerbayarVal, unpaid: totalInvoicesBelumBayarVal }
-              ].map((data, i) => {
-                const totalMonth = data.paid + data.unpaid;
-                const maxVal = 70000000; // Normalizer scale
-                const paidHeight = (data.paid / maxVal) * 200;
-                const unpaidHeight = (data.unpaid / maxVal) * 200;
+              {/* Monthly Bar Pillars (Jan - Des) */}
+              {monthsData.map((data, i) => {
+                const paidHeight = maxMonthVal > 0 ? (data.paid / maxMonthVal) * 200 : 0;
+                const unpaidHeight = maxMonthVal > 0 ? (data.unpaid / maxMonthVal) * 200 : 0;
 
                 return (
-                  <div key={i} className="flex flex-col items-center gap-2 group z-10 w-1/5 relative">
+                  <div key={i} className="flex flex-col items-center gap-2 group z-10 w-8 md:w-12 relative flex-shrink-0">
                     {/* Tooltip on hover */}
-                    <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-all bg-zinc-950 text-white text-[10px] p-2 rounded shadow-xl z-50 text-center pointer-events-none min-w-[120px]">
-                      <p className="font-extrabold text-red-400">{data.bulan} 2026</p>
+                    <div className="absolute -top-14 opacity-0 group-hover:opacity-100 transition-all bg-zinc-950 text-white text-[10px] p-2 rounded shadow-xl z-50 text-center pointer-events-none min-w-[130px]">
+                      <p className="font-extrabold text-red-400">{data.bulan} {selectedYear}</p>
                       <p className="mt-0.5">Lunas: {formatIDR(data.paid)}</p>
                       <p>Piutang: {formatIDR(data.unpaid)}</p>
                     </div>
 
                     {/* Bar stack */}
-                    <div className="w-12 flex flex-col justify-end h-[200px] gap-0.5 rounded-t-md overflow-hidden">
+                    <div className="w-6 md:w-9 flex flex-col justify-end h-[200px] gap-0.5 rounded-t-md overflow-hidden bg-zinc-50 dark:bg-zinc-950/40">
                       {/* Unpaid part (top) */}
                       {data.unpaid > 0 && (
                         <div 
-                          style={{ height: `${unpaidHeight}px` }} 
+                          style={{ height: `${Math.max(4, unpaidHeight)}px` }} 
                           className="w-full bg-red-400 dark:bg-red-500/80 hover:brightness-110 transition-all rounded-t-sm"
                           title={`Unpaid: ${formatIDR(data.unpaid)}`}
                         ></div>
@@ -340,7 +382,7 @@ export const DashboardView: React.FC = () => {
                       {/* Paid part (bottom) */}
                       {data.paid > 0 && (
                         <div 
-                          style={{ height: `${paidHeight}px` }} 
+                          style={{ height: `${Math.max(4, paidHeight)}px` }} 
                           className="w-full bg-red-700 dark:bg-red-600 hover:brightness-110 transition-all"
                           title={`Paid: ${formatIDR(data.paid)}`}
                         ></div>
@@ -348,7 +390,7 @@ export const DashboardView: React.FC = () => {
                     </div>
 
                     {/* Label */}
-                    <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{data.bulan}</span>
+                    <span className="text-[10px] md:text-xs font-bold text-zinc-600 dark:text-zinc-400">{data.bulan}</span>
                   </div>
                 );
               })}
