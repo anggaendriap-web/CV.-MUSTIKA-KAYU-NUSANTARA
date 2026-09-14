@@ -22,7 +22,7 @@ import {
   DEFAULT_ASET_INIT,
   DEFAULT_PAJAK_INIT
 } from '../data/financeDefaults';
-import { db, doc, collection, onSnapshot, setDoc, deleteDoc } from '../firebase';
+import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
 
 interface AppContextProps {
   materials: Material[];
@@ -44,7 +44,9 @@ interface AppContextProps {
   isFirebaseConnected: boolean;
   syncStatus: 'synced' | 'syncing' | 'offline';
 
-  // Auth actions
+  // Passwords & Auth actions
+  passwords: Record<UserRole, string>;
+  updatePassword: (role: UserRole, newPassword: string) => { success: boolean; message: string };
   login: (role: UserRole, password: string) => boolean;
   logout: () => void;
   switchUser: (role: UserRole) => void;
@@ -131,7 +133,7 @@ const MOCK_USERS: Record<UserRole, User> = {
   OWNER: { id: 'usr-4', username: 'owner_mustika', name: 'Owner', role: 'OWNER' }
 };
 
-const PASSWORDS: Record<UserRole, string> = {
+export const DEFAULT_PASSWORDS: Record<UserRole, string> = {
   ADMIN_SALES: 'sales123',
   WAREHOUSE: 'warehouse123',
   FINANCE: 'finance123',
@@ -155,6 +157,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
+  const [passwords, setPasswords] = useState<Record<UserRole, string>>(() => {
+    const cached = localStorage.getItem('mk_passwords');
+    if (cached) {
+      try {
+        return { ...DEFAULT_PASSWORDS, ...JSON.parse(cached) };
+      } catch {
+        return DEFAULT_PASSWORDS;
+      }
+    }
+    return DEFAULT_PASSWORDS;
+  });
 
   const isInitialSyncDone = useRef(false);
 
@@ -185,6 +198,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load from LocalStorage and setup Firestore real-time subscriptions
   useEffect(() => {
+    // 0. Test Firestore Server Connection
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'app_config', 'passwords'));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.warn("Firestore client is offline, using offline cache.");
+          setIsFirebaseConnected(false);
+          setSyncStatus('offline');
+        } else {
+          setIsFirebaseConnected(true);
+        }
+      }
+    };
+    testConnection();
+
     // 1. Load cached UI states
     const cachedDarkMode = localStorage.getItem('mk_dark_mode') === 'true';
     setDarkMode(cachedDarkMode);
@@ -234,12 +265,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const unsubPOs = onSnapshot(collection(db, 'purchase_orders'), (snap) => {
         if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as PurchaseOrder);
+          const rawList = snap.docs.map(d => d.data() as PurchaseOrder);
+          const list = rawList.map(po => ({
+            ...po,
+            nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+              ? po.nomorInvoice
+              : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+            statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+              ? 'Belum Bayar'
+              : po.statusInvoice
+          }));
           setPurchaseOrders(list);
           localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
         } else if (!isInitialSyncDone.current) {
           const cached = localStorage.getItem('mk_purchase_orders');
-          if (cached) setPurchaseOrders(JSON.parse(cached));
+          if (cached) {
+            try {
+              const rawList = JSON.parse(cached) as PurchaseOrder[];
+              const list = rawList.map(po => ({
+                ...po,
+                nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+                  ? po.nomorInvoice
+                  : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+                statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+                  ? 'Belum Bayar'
+                  : po.statusInvoice
+              }));
+              setPurchaseOrders(list);
+            } catch (e) {
+              // ignore
+            }
+          }
         }
       });
 
@@ -347,6 +403,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
 
+      const unsubPasswords = onSnapshot(doc(db, 'app_config', 'passwords'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as Record<UserRole, string>;
+          if (data) {
+            setPasswords(prev => {
+              const merged = { ...prev, ...data };
+              localStorage.setItem('mk_passwords', JSON.stringify(merged));
+              return merged;
+            });
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore passwords sync fallback:', err);
+      });
+
       isInitialSyncDone.current = true;
 
       return () => {
@@ -362,6 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubBukuBank();
         unsubAset();
         unsubPajak();
+        unsubPasswords();
       };
     } catch (err) {
       console.warn('Firebase initialization error, using local persistence:', err);
@@ -430,9 +502,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mk_laporan_pajak', JSON.stringify(newPajak));
   };
 
-  // Auth Operations
+  // Auth & Password Operations
+  const updatePassword = (role: UserRole, newPassword: string): { success: boolean; message: string } => {
+    const trimmed = newPassword.trim();
+    if (!trimmed || trimmed.length < 4) {
+      return { success: false, message: 'Password baru minimal harus 4 karakter!' };
+    }
+    const updated = {
+      ...passwords,
+      [role]: trimmed
+    };
+    setPasswords(updated);
+    localStorage.setItem('mk_passwords', JSON.stringify(updated));
+    syncToFirestore('app_config', 'passwords', updated);
+    return { success: true, message: `Password untuk role ${role.replace('_', ' ')} berhasil diperbarui!` };
+  };
+
   const login = (role: UserRole, password: string): boolean => {
-    if (PASSWORDS[role] === password) {
+    const validPassword = passwords[role] || DEFAULT_PASSWORDS[role];
+    if (validPassword === password) {
       const user = MOCK_USERS[role];
       setCurrentUser(user);
       localStorage.setItem('mk_current_user', JSON.stringify(user));
@@ -625,8 +713,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- CRUD Purchase Orders ---
   const addPurchaseOrder = (po: Omit<PurchaseOrder, 'id'>) => {
     const id = `po-${Date.now()}`;
+    const generatedInv = po.nomorInvoice && po.nomorInvoice.trim() !== ''
+      ? po.nomorInvoice
+      : `INV/MKN/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
+    const effectiveStatus = (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+      ? 'Belum Bayar'
+      : po.statusInvoice;
     const newPO: PurchaseOrder = {
       ...po,
+      nomorInvoice: generatedInv,
+      statusInvoice: effectiveStatus,
       id
     };
     const updated = [newPO, ...purchaseOrders];
@@ -1130,6 +1226,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       darkMode,
       isFirebaseConnected,
       syncStatus,
+      passwords,
+      updatePassword,
       login,
       logout,
       switchUser,

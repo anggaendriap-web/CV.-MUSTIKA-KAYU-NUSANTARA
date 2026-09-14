@@ -1,34 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
 import { CompanyLogo } from './CompanyLogo';
-import { ShieldCheck, Lock, User, TreePine } from 'lucide-react';
+import { ShieldCheck, Lock, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
+import { EditPasswordModal } from './EditPasswordModal';
 
 export const LoginView: React.FC = () => {
-  const { login } = useApp();
+  const { login, passwords } = useApp();
   const [selectedRole, setSelectedRole] = useState<UserRole>('OWNER');
-  const [password, setPassword] = useState('owner123');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState('');
+
+  // Set initial password based on active passwords
+  useEffect(() => {
+    if (passwords[selectedRole]) {
+      setPassword(passwords[selectedRole]);
+    }
+  }, [selectedRole, passwords]);
 
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
-    // Auto-fill passwords to make it very easy for the user to try each role
-    const pwMap: Record<UserRole, string> = {
-      ADMIN_SALES: 'sales123',
-      WAREHOUSE: 'warehouse123',
-      FINANCE: 'finance123',
-      OWNER: 'owner123'
-    };
-    setPassword(pwMap[role]);
+    setPassword(passwords[role] || '');
     setError('');
+    setSuccessToast('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const success = login(selectedRole, password);
     if (!success) {
-      setError('Password salah! Silakan coba lagi.');
+      setError('Password salah! Silakan coba lagi atau gunakan tombol Edit Password jika lupa.');
     }
+  };
+
+  const handlePasswordUpdated = (role: UserRole, newPw: string) => {
+    if (role === selectedRole) {
+      setPassword(newPw);
+    }
+    setSuccessToast(`Password untuk ${role.replace('_', ' ')} berhasil diubah menjadi "${newPw}"! Silakan klik tombol Masuk.`);
+    setError('');
   };
 
   const getRoleBadgeColor = (role: UserRole) => {
@@ -133,25 +146,63 @@ export const LoginView: React.FC = () => {
                   <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                     PASSWORD AKUN
                   </label>
-                  <span className="text-[10px] text-red-600 dark:text-red-400 font-medium">
-                    Kunci demo: <code className="bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono">{selectedRole === 'OWNER' ? 'owner123' : selectedRole === 'FINANCE' ? 'finance123' : selectedRole === 'WAREHOUSE' ? 'warehouse123' : 'sales123'}</code>
-                  </span>
+                  <button
+                    type="button"
+                    id="btn-open-edit-password"
+                    onClick={() => {
+                      setError('');
+                      setIsEditModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200/80 dark:border-red-900/60 rounded-md transition-all cursor-pointer shadow-2xs"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Edit Password</span>
+                  </button>
                 </div>
+
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400 dark:text-zinc-500">
                     <Lock className="h-4.5 w-4.5" />
                   </div>
                   <input
                     id="password-input"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Masukkan password..."
-                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                    className="block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                    title={showPassword ? 'Sembunyikan password' : 'Lihat password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400 px-0.5">
+                  <span className="flex items-center gap-1.5">
+                    Kunci aktif: <code className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 px-1.5 py-0.5 rounded font-mono font-bold text-xs">{passwords[selectedRole] || 'owner123'}</code>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="text-red-600 dark:text-red-400 hover:underline cursor-pointer font-medium"
+                  >
+                    Ganti kata sandi
+                  </button>
                 </div>
               </div>
+
+              {successToast && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-xs font-semibold text-emerald-700 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800/80 flex items-start gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{successToast}</span>
+                </div>
+              )}
 
               {error && (
                 <div id="login-error" className="p-3 bg-red-50 dark:bg-red-950/20 text-xs font-semibold text-red-600 dark:text-red-400 rounded-lg border border-red-200/50 dark:border-red-900/50">
@@ -171,6 +222,14 @@ export const LoginView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal Edit Password Saat Login */}
+      <EditPasswordModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        initialRole={selectedRole}
+        onPasswordUpdated={handlePasswordUpdated}
+      />
     </div>
   );
 };

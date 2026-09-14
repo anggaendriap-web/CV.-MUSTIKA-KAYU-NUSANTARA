@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
-import { Menu, Sun, Moon, Bell, RefreshCw, TriangleAlert, Info, Database, CheckCircle2 } from 'lucide-react';
+import { Menu, Sun, Moon, Bell, RefreshCw, TriangleAlert, Info, Database } from 'lucide-react';
 
 interface TopbarProps {
   activeTab: string;
@@ -9,7 +9,7 @@ interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ activeTab, setMobileOpen }) => {
-  const { currentUser, switchUser, darkMode, toggleDarkMode, materials, finishGoods, purchaseOrders, isFirebaseConnected, syncStatus } = useApp();
+  const { currentUser, switchUser, darkMode, toggleDarkMode, materials, finishGoods, purchaseOrders, isFirebaseConnected } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
 
@@ -70,19 +70,18 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setMobileOpen }) => {
 
       {/* Right Area: Control Panel */}
       <div className="flex items-center gap-3 relative">
-        
-        {/* Firebase Cloud Live Indicator */}
+        {/* Firebase Cloud Live Badge */}
         <div 
-          className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${
-            isFirebaseConnected 
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
-              : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300'
-          }`}
-          title="Status database Cloud Firestore terhubung secara real-time"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-lg text-xs"
+          title={isFirebaseConnected ? "Database Firebase Firestore Aktif & Realtime Terhubung" : "Menghubungkan ke Database Firebase..."}
         >
-          <Database className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-[11px] font-bold">Firebase Firestore</span>
-          <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-ping' : 'bg-emerald-500'}`}></span>
+          <Database className={`h-3.5 w-3.5 ${isFirebaseConnected ? 'text-emerald-500' : 'text-amber-500'}`} />
+          <span className="flex items-center gap-1 text-zinc-700 dark:text-zinc-300">
+            <span className={`h-1.5 w-1.5 rounded-full ${isFirebaseConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`}></span>
+            <span className="text-[11px] font-bold">
+              {isFirebaseConnected ? 'DB Aktif' : 'Menghubungkan...'}
+            </span>
+          </span>
         </div>
 
         {/* Quick Role Switcher (Best UX for Testing) */}

@@ -19,7 +19,8 @@ import {
   Landmark,
   Scale,
   Boxes,
-  Receipt
+  Receipt,
+  Database
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -47,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen,
   setMobileOpen
 }) => {
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout, isFirebaseConnected } = useApp();
 
   const navigationItems: NavItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard Rekapan', icon: LayoutDashboard, roles: ['OWNER', 'FINANCE', 'WAREHOUSE', 'ADMIN_SALES'] },
@@ -185,7 +186,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3 border-t border-red-950 shrink-0">
+        <div className="p-3 border-t border-red-950 shrink-0 space-y-2">
+          {/* Cloud Database Status Badge */}
+          <div 
+            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-red-950/60 border border-red-800/40 text-[11px] ${
+              collapsed ? 'justify-center' : ''
+            }`}
+            title="Database Firebase Firestore: Aktif & Terhubung Realtime"
+          >
+            <Database className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+            {!collapsed && (
+              <div className="flex items-center justify-between flex-1 min-w-0">
+                <span className="text-red-200 font-medium truncate">Firebase DB</span>
+                <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Aktif
+                </span>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => logout()}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-red-200 hover:bg-red-950/80 hover:text-white transition-all cursor-pointer ${

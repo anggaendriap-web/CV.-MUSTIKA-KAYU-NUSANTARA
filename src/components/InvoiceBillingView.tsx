@@ -73,17 +73,18 @@ export const InvoiceBillingView: React.FC = () => {
   // Filtered Invoices
   const filteredInvoices = useMemo(() => {
     return purchaseOrders.filter(po => {
-      // Search
+      // Search (supports Invoice No, PO No, JO No, Customer)
       const matchesSearch = 
         (po.nomorInvoice?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
         po.nomorPO.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (po.nomorJO && po.nomorJO.toLowerCase().includes(searchTerm.toLowerCase())) ||
         po.pelanggan.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Status
+      // Status (No draft or belum terbit; invoices are immediately active)
       const matchesStatus = 
         statusFilter === 'Semua' ? true :
         statusFilter === 'Lunas' ? po.statusInvoice === 'Lunas' :
-        statusFilter === 'Belum Lunas' ? po.statusInvoice === 'Belum Lunas' :
+        statusFilter === 'Belum Lunas' ? (po.statusInvoice === 'Belum Bayar' || (po.statusInvoice as string) === 'Belum Lunas') :
         po.statusInvoice === 'Jatuh Tempo';
 
       // Customer
@@ -91,11 +92,12 @@ export const InvoiceBillingView: React.FC = () => {
 
       // Date Period
       let matchesDate = true;
-      if (startDate) {
-        matchesDate = matchesDate && po.tanggalOrder >= startDate;
+      const orderDate = po.tanggalOrder || po.tanggal;
+      if (startDate && orderDate) {
+        matchesDate = matchesDate && orderDate >= startDate;
       }
-      if (endDate) {
-        matchesDate = matchesDate && po.tanggalOrder <= endDate;
+      if (endDate && orderDate) {
+        matchesDate = matchesDate && orderDate <= endDate;
       }
 
       return matchesSearch && matchesStatus && matchesCustomer && matchesDate;
@@ -308,6 +310,7 @@ export const InvoiceBillingView: React.FC = () => {
             <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 font-bold border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <th className="p-3.5">No. Invoice & PO</th>
+                <th className="p-3.5">Nomor JO (Job Order)</th>
                 <th className="p-3.5">Tanggal Order</th>
                 <th className="p-3.5">Pelanggan / Perusahaan</th>
                 <th className="p-3.5">Item Pallet</th>
@@ -319,7 +322,7 @@ export const InvoiceBillingView: React.FC = () => {
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-zinc-400">
+                  <td colSpan={8} className="p-8 text-center text-zinc-400">
                     Tidak ada faktur invoice yang sesuai dengan filter atau periode yang dipilih.
                   </td>
                 </tr>
@@ -329,11 +332,16 @@ export const InvoiceBillingView: React.FC = () => {
                   return (
                     <tr key={po.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
                       <td className="p-3.5">
-                        <span className="font-bold text-red-700 dark:text-red-400 block">{invoiceNo}</span>
+                        <span className="font-bold text-red-700 dark:text-red-400 block font-mono">{invoiceNo}</span>
                         <span className="text-[11px] text-zinc-400">Ref PO: {po.nomorPO}</span>
                       </td>
+                      <td className="p-3.5">
+                        <span className="inline-block px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-mono font-bold rounded-lg text-[11px]">
+                          {po.nomorJO || '-'}
+                        </span>
+                      </td>
                       <td className="p-3.5 text-zinc-600 dark:text-zinc-300 font-medium">
-                        {po.tanggalOrder}
+                        {po.tanggalOrder || po.tanggal}
                       </td>
                       <td className="p-3.5">
                         <span className="font-bold text-zinc-900 dark:text-white block">{po.pelanggan}</span>
@@ -443,7 +451,12 @@ export const InvoiceBillingView: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <span className="text-lg font-black text-zinc-900 block">FAKTUR INVOICE</span>
-                    <span className="text-xs font-bold text-red-700 block">{selectedPO.nomorInvoice || `INV/MKN/2026/08/${selectedPO.id.slice(-3)}`}</span>
+                    <span className="text-xs font-bold text-red-700 block font-mono">{selectedPO.nomorInvoice || `INV/MKN/2026/08/${selectedPO.id.slice(-3)}`}</span>
+                    {selectedPO.nomorJO && (
+                      <span className="text-[11px] font-bold font-mono text-blue-700 block mt-0.5">
+                        No. JO: {selectedPO.nomorJO}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -454,16 +467,20 @@ export const InvoiceBillingView: React.FC = () => {
                     <div className="font-extrabold text-sm text-zinc-900">{selectedPO.pelanggan}</div>
                     <div className="text-[11px] text-zinc-600 mt-1">{selectedPO.tujuanPengiriman}</div>
                   </div>
-                  <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200 space-y-1">
-                    <div className="flex justify-between">
+                  <div className="bg-zinc-50 p-3 rounded-lg border border-zinc-200 space-y-1.5">
+                    <div className="flex justify-between items-center">
                       <span className="text-zinc-500 font-medium">Tanggal Faktur:</span>
-                      <span className="font-bold text-zinc-900">{selectedPO.tanggalOrder}</span>
+                      <span className="font-bold text-zinc-900">{selectedPO.tanggalOrder || selectedPO.tanggal}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center bg-blue-50/80 px-2 py-0.5 rounded border border-blue-100">
+                      <span className="text-blue-900 font-extrabold text-[10px]">NOMOR JO (JOB ORDER):</span>
+                      <span className="font-mono font-bold text-blue-700 text-xs">{selectedPO.nomorJO || '-'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
                       <span className="text-zinc-500 font-medium">Nomor PO Buyer:</span>
                       <span className="font-bold text-zinc-900">{selectedPO.nomorPO}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-zinc-500 font-medium">Status Tagihan:</span>
                       <span className={`font-bold ${selectedPO.statusInvoice === 'Lunas' ? 'text-emerald-700' : 'text-amber-700'}`}>
                         {selectedPO.statusInvoice}
@@ -607,6 +624,7 @@ export const InvoiceBillingView: React.FC = () => {
                   <thead>
                     <tr className="bg-red-900 text-white font-bold">
                       <th className="p-2 text-left">No. Faktur</th>
+                      <th className="p-2 text-left">No. JO</th>
                       <th className="p-2 text-left">Tgl Order</th>
                       <th className="p-2 text-left">Pelanggan</th>
                       <th className="p-2 text-left">Item Ringkasan</th>
@@ -617,8 +635,9 @@ export const InvoiceBillingView: React.FC = () => {
                   <tbody className="divide-y divide-zinc-200 border-b border-zinc-200">
                     {filteredInvoices.map((po, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
-                        <td className="p-2 font-bold text-red-900">{po.nomorInvoice || `INV-${po.id.slice(-3)}`}</td>
-                        <td className="p-2">{po.tanggalOrder}</td>
+                        <td className="p-2 font-bold font-mono text-red-900">{po.nomorInvoice || `INV-${po.id.slice(-3)}`}</td>
+                        <td className="p-2 font-mono font-bold text-blue-800">{po.nomorJO || '-'}</td>
+                        <td className="p-2">{po.tanggalOrder || po.tanggal}</td>
                         <td className="p-2 font-semibold">{po.pelanggan}</td>
                         <td className="p-2">{po.item.map(i => `${i.namaItem} (${i.jumlah})`).join(', ')}</td>
                         <td className="p-2 text-right font-bold">{formatRupiah(po.totalHarga)}</td>
@@ -632,7 +651,7 @@ export const InvoiceBillingView: React.FC = () => {
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-100 font-bold">
-                      <td colSpan={4} className="p-2 text-right">TOTAL NILAI FAKTUR PERIODE:</td>
+                      <td colSpan={5} className="p-2 text-right">TOTAL NILAI FAKTUR PERIODE:</td>
                       <td className="p-2 text-right font-black text-red-900">{formatRupiah(totalNilaiInvoice)}</td>
                       <td></td>
                     </tr>

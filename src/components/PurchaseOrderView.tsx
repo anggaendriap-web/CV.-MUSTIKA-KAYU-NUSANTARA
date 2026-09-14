@@ -7,7 +7,7 @@ import {
   Plus, Search, FileText, CheckCircle, Clock, Trash2, Printer, Eye, 
   ShoppingCart, DollarSign, Ban, Users, Award, TrendingUp, Building, 
   Percent, Calendar, Edit2, ChevronRight, Check, AlertCircle, RefreshCw,
-  Download, X
+  Download, X, Copy
 } from 'lucide-react';
 import { exportToExcel } from '../utils/exportExcel';
 import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
@@ -87,6 +87,7 @@ export const PurchaseOrderView: React.FC = () => {
   // Create PO Form fields
   const [nomorPO, setNomorPO] = useState('');
   const [nomorJO, setNomorJO] = useState('');
+  const [nomorInvoice, setNomorInvoice] = useState('');
   const [pelanggan, setPelanggan] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [catatan, setCatatan] = useState('');
@@ -138,6 +139,7 @@ export const PurchaseOrderView: React.FC = () => {
     setEditingId(null);
     setNomorPO('');
     setNomorJO('');
+    setNomorInvoice(`INV/MKN/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`);
     setPelanggan('');
     setTanggal(new Date().toISOString().split('T')[0]);
     setCatatan('');
@@ -158,6 +160,7 @@ export const PurchaseOrderView: React.FC = () => {
     setEditingId(po.id);
     setNomorPO(po.nomorPO);
     setNomorJO(po.nomorJO || `JO/MKN/2026/08/${Math.floor(100 + Math.random() * 900)}`);
+    setNomorInvoice(po.nomorInvoice || `INV/MKN/2026/08/${Math.floor(100 + Math.random() * 900)}`);
     setPelanggan(po.pelanggan);
     setTanggal(po.tanggal);
     setCatatan(po.catatan || '');
@@ -181,17 +184,26 @@ export const PurchaseOrderView: React.FC = () => {
   // Dynamic Item Form Row Handlers
   const handleAddItemRow = () => {
     const template = finishGoods[0];
+    const initialPrice = template ? template.hargaJual : 145000;
+    const initialQty = 100;
     setFormItems([
       ...formItems,
       {
         finishGoodId: template ? template.id : '',
         namaItem: template ? template.nama : '',
-        tipeIspm: 'Lokal',
-        jumlah: 50,
-        hargaSatuan: template ? template.hargaJual : 145000,
-        subtotal: (template ? template.hargaJual : 145000) * 50
+        tipeIspm: template && template.standarISPM ? 'Ekspor ISPM' : 'Lokal',
+        jumlah: initialQty,
+        hargaSatuan: initialPrice,
+        subtotal: initialPrice * initialQty
       }
     ]);
+  };
+
+  const handleDuplicateItemRow = (index: number) => {
+    const itemToClone = formItems[index];
+    const newItems = [...formItems];
+    newItems.splice(index + 1, 0, { ...itemToClone });
+    setFormItems(newItems);
   };
 
   const handleRemoveItemRow = (index: number) => {
@@ -211,12 +223,15 @@ export const PurchaseOrderView: React.FC = () => {
           if (matchedGood) {
             newItem.namaItem = matchedGood.nama;
             newItem.hargaSatuan = matchedGood.hargaJual;
+            newItem.tipeIspm = matchedGood.standarISPM ? 'Ekspor ISPM' : 'Lokal';
           }
         }
         
         // Compute subtotal on qty or price change
         if (field === 'jumlah' || field === 'hargaSatuan' || field === 'finishGoodId') {
-          newItem.subtotal = newItem.jumlah * newItem.hargaSatuan;
+          const qty = Number(newItem.jumlah) || 0;
+          const price = Number(newItem.hargaSatuan) || 0;
+          newItem.subtotal = qty * price;
         }
         return newItem;
       }
@@ -261,10 +276,14 @@ export const PurchaseOrderView: React.FC = () => {
       subtotal: it.subtotal
     }));
 
+    const finalInvoiceNo = nomorInvoice.trim() || `INV/MKN/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
+
     if (editingId) {
       updatePurchaseOrder(editingId, {
         nomorPO,
         nomorJO,
+        nomorInvoice: finalInvoiceNo,
+        statusInvoice: 'Belum Bayar',
         pelanggan,
         tanggal,
         item: itemsToSave,
@@ -281,7 +300,7 @@ export const PurchaseOrderView: React.FC = () => {
       addPurchaseOrder({
         nomorPO,
         nomorJO,
-        nomorInvoice: '',
+        nomorInvoice: finalInvoiceNo,
         tanggal,
         pelanggan,
         item: itemsToSave,
@@ -292,7 +311,7 @@ export const PurchaseOrderView: React.FC = () => {
         totalHarga: total,
         namaMarketing,
         statusPO: 'Diterima',
-        statusInvoice: 'Belum Terbit',
+        statusInvoice: 'Belum Bayar',
         tanggalJatuhTempo,
         catatan
       });
@@ -455,9 +474,9 @@ export const PurchaseOrderView: React.FC = () => {
 
   const getStatusInvoiceBadge = (status: PurchaseOrder['statusInvoice']) => {
     switch (status) {
-      case 'Belum Terbit': return 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400';
-      case 'Belum Bayar': return 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400';
+      case 'Belum Bayar': return 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
       case 'Lunas': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300';
+      default: return 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
     }
   };
 
@@ -607,10 +626,9 @@ export const PurchaseOrderView: React.FC = () => {
                   onChange={(e) => setStatusInvoiceFilter(e.target.value)}
                   className="block w-full sm:w-auto px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none"
                 >
-                  <option value="SEMUA">Semua Invoice</option>
-                  <option value="Belum Terbit">Belum Terbit</option>
-                  <option value="Belum Bayar">Belum Bayar</option>
-                  <option value="Lunas">Lunas</option>
+                  <option value="SEMUA">Semua Status Invoice</option>
+                  <option value="Belum Bayar">Belum Bayar (Unpaid)</option>
+                  <option value="Lunas">Lunas (Paid)</option>
                 </select>
               </div>
             </div>
@@ -731,19 +749,10 @@ export const PurchaseOrderView: React.FC = () => {
                             </select>
                           )}
 
-                          {/* --- ROLE ACTION: FINANCE ACTION (Generate Invoice / Settle Lunas) --- */}
+                          {/* --- ROLE ACTION: FINANCE ACTION (Settle Lunas) --- */}
                           {canModifyFinance && (
                             <>
-                              {po.statusInvoice === 'Belum Terbit' ? (
-                                <button
-                                  id={`btn-issue-inv-${po.id}`}
-                                  onClick={() => handleGenerateInvoice(po.id)}
-                                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] rounded cursor-pointer transition-all"
-                                  title="Terbitkan Invoice"
-                                >
-                                  Terbit Inv
-                                </button>
-                              ) : po.statusInvoice === 'Belum Bayar' ? (
+                              {po.statusInvoice !== 'Lunas' ? (
                                 <button
                                   id={`btn-pay-inv-${po.id}`}
                                   onClick={() => handleOpenPaymentModal(po.id)}
@@ -1077,57 +1086,81 @@ export const PurchaseOrderView: React.FC = () => {
 
       {/* --- ADD / EDIT PURCHASE ORDER FORM MODAL --- */}
       {showFormModal && (
-        <div id="po-form-modal" className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden my-8">
-            <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center">
-              <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
-                {editingId ? 'Edit Purchase Order' : 'Buat Purchase Order Pelanggan'}
-              </h3>
-              <button onClick={() => setShowFormModal(false)} className="text-zinc-400 hover:text-zinc-650 cursor-pointer text-xl">&times;</button>
+        <div id="po-form-modal" className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto backdrop-blur-2xs">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-5xl rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden my-6 transition-all">
+            <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center bg-zinc-50/50 dark:bg-zinc-950/50">
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100">
+                  {editingId ? 'Edit Purchase Order' : 'Buat Purchase Order Pelanggan'}
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Isi data PO resmi, pelanggan, dan rincian item pekerjaan produksi pallet kayu.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowFormModal(false)} 
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer text-2xl p-1 leading-none"
+              >
+                &times;
+              </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="p-5 space-y-4">
+            <form onSubmit={handleFormSubmit} className="p-6 space-y-5">
               
-              {/* No PO, No JO, Date Row */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1 col-span-1">
-                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">NOMOR PO RESMI</label>
+              {/* No PO, No JO, No Invoice, Date Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">NOMOR PO RESMI</label>
                   <input
                     type="text"
                     required
                     value={nomorPO}
                     onChange={(e) => setNomorPO(e.target.value)}
-                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    placeholder="e.g. PO/MKN/2026/08/01"
+                    className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                 </div>
 
-                <div className="space-y-1 col-span-1">
-                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">NOMOR JO (JOB ORDER)</label>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">NOMOR JO (JOB ORDER)</label>
                   <input
                     type="text"
                     required
                     value={nomorJO}
                     onChange={(e) => setNomorJO(e.target.value)}
-                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    placeholder="e.g. JO/MKN/2026/08/101"
+                    className="block w-full px-3 py-2 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 rounded-lg text-xs font-mono font-bold text-blue-700 dark:text-blue-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
 
-                <div className="space-y-1 col-span-1">
-                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">TANGGAL MASUK</label>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">NO. FAKTUR INVOICE (OTOMATIS)</label>
+                  <input
+                    type="text"
+                    required
+                    value={nomorInvoice}
+                    onChange={(e) => setNomorInvoice(e.target.value)}
+                    placeholder="e.g. INV/MKN/2026/08/001"
+                    className="block w-full px-3 py-2 bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/60 rounded-lg text-xs font-mono font-bold text-red-700 dark:text-red-300 focus:ring-2 focus:ring-red-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">TANGGAL MASUK</label>
                   <input
                     type="date"
                     required
                     value={tanggal}
                     onChange={(e) => setTanggal(e.target.value)}
-                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Customer Selection & Auto Customer Insertion support */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">PELANGGAN (AUTO-SAVE JIKA BARU)</label>
+                  <label className="block text-[10px] font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">PELANGGAN (AUTO-SAVE JIKA BARU)</label>
                   <input
                     type="text"
                     required
@@ -1135,17 +1168,17 @@ export const PurchaseOrderView: React.FC = () => {
                     placeholder="Ketik / Pilih nama perusahaan..."
                     value={pelanggan}
                     onChange={(e) => setPelanggan(e.target.value)}
-                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                   <datalist id="customer-datalist">
                     {customers.map(c => (
-                      <option key={c.id} value={custNama}>{c.nama}</option>
+                      <option key={c.id} value={c.nama}>{c.nama}</option>
                     ))}
                   </datalist>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">NAMA MARKETING</label>
+                  <label className="block text-[10px] font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">NAMA MARKETING</label>
                   <input
                     type="text"
                     required
@@ -1153,7 +1186,7 @@ export const PurchaseOrderView: React.FC = () => {
                     placeholder="Nama staf marketing..."
                     value={namaMarketing}
                     onChange={(e) => setNamaMarketing(e.target.value)}
-                    className="block w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
+                    className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                   <datalist id="marketing-datalist">
                     {marketingList.map(m => (
@@ -1163,104 +1196,190 @@ export const PurchaseOrderView: React.FC = () => {
                 </div>
               </div>
 
-              {/* DYNAMIC ITEM PEKERJAAN LIST */}
-              <div className="p-4 bg-zinc-50/70 dark:bg-zinc-950 rounded-xl border border-zinc-200/55 dark:border-zinc-850 space-y-3">
-                <div className="flex justify-between items-center">
-                  <p className="text-[10px] font-black text-zinc-400 uppercase">Daftar Item Pekerjaan (Dapat Diedit & Ditambah)</p>
+              {/* DYNAMIC ITEM PEKERJAAN LIST - DIPERPANJANG & DIPERBESAR */}
+              <div className="p-4 sm:p-5 bg-zinc-50/80 dark:bg-zinc-950/80 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                        Daftar Item Pekerjaan (Dapat Diedit & Ditambah)
+                      </p>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
+                        {formItems.length} Item
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Kolom Nama Item, Tipifikasi, Qty, dan Harga telah diperluas dan diperpanjang agar nyaman diinput dan diedit.
+                    </p>
+                  </div>
                   <button
                     type="button"
+                    id="btn-tambah-baris-item"
                     onClick={handleAddItemRow}
-                    className="text-[10px] font-bold text-red-650 hover:text-red-800 flex items-center gap-0.5 cursor-pointer bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded"
+                    className="self-start sm:self-auto text-xs font-bold text-white bg-red-600 hover:bg-red-700 flex items-center gap-1.5 cursor-pointer px-3.5 py-2 rounded-lg shadow-sm hover:shadow transition-all active:scale-[0.98]"
                   >
-                    <Plus className="h-3 w-3" /> Tambah Item
+                    <Plus className="h-4 w-4" /> Tambah Baris Item
                   </button>
                 </div>
 
-                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                  {formItems.map((formItem, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-end bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-150 dark:border-zinc-800">
-                      
-                      {/* Select Template Optional */}
-                      <div className="col-span-4 space-y-1">
-                        <label className="block text-[9px] font-bold text-zinc-400 uppercase">NAMA ITEM / TEMPLATE</label>
-                        <select
-                          value={formItem.finishGoodId}
-                          onChange={(e) => handleItemFieldChange(index, 'finishGoodId', e.target.value)}
-                          className="block w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-[11px]"
-                        >
-                          <option value="">-- Ketik Bebas / Pilih Template --</option>
-                          {finishGoods.map(fg => (
-                            <option key={fg.id} value={fg.id}>{fg.nama}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nama item pekerjaan..."
-                          value={formItem.namaItem}
-                          onChange={(e) => handleItemFieldChange(index, 'namaItem', e.target.value)}
-                          className="block w-full px-2 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded text-[11px] font-bold mt-1"
-                        />
-                      </div>
+                {/* Table Container dengan Scroll Vertikal Luas & Kolom Lebar */}
+                <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
+                  <div className="max-h-[460px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse min-w-[820px]">
+                      <thead className="sticky top-0 z-10 bg-zinc-100 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 text-[10px] font-extrabold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
+                        <tr>
+                          <th className="py-3 px-3 w-10 text-center">#</th>
+                          <th className="py-3 px-4 min-w-[340px]">KOLOM NAMA ITEM PEKERJAAN</th>
+                          <th className="py-3 px-3 min-w-[190px]">KOLOM TIPIFIKASI</th>
+                          <th className="py-3 px-3 min-w-[130px] text-center">KOLOM QTY</th>
+                          <th className="py-3 px-3 min-w-[200px] text-right">KOLOM HARGA SATUAN</th>
+                          <th className="py-3 px-3 min-w-[160px] text-right">SUBTOTAL</th>
+                          <th className="py-3 px-2 w-20 text-center">AKSI</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200/80 dark:divide-zinc-800">
+                        {formItems.map((formItem, index) => (
+                          <tr key={index} className="hover:bg-zinc-50/70 dark:hover:bg-zinc-850/40 transition-colors">
+                            
+                            {/* Nomor Baris */}
+                            <td className="py-3.5 px-3 text-center text-xs font-mono font-bold text-zinc-400 align-middle">
+                              {index + 1}
+                            </td>
 
-                      {/* Dropdown Lokal / ISPM */}
-                      <div className="col-span-2.5 space-y-1">
-                        <label className="block text-[9px] font-bold text-zinc-400 uppercase">TIPIFIKASI</label>
-                        <select
-                          value={formItem.tipeIspm}
-                          onChange={(e) => handleItemFieldChange(index, 'tipeIspm', e.target.value)}
-                          className="block w-full px-2 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-[11px] font-bold"
-                        >
-                          <option value="Lokal">Lokal</option>
-                          <option value="Ekspor ISPM">Ekspor ISPM</option>
-                        </select>
-                      </div>
+                            {/* KOLOM NAMA ITEM (Diperpanjang & Diperbesar) */}
+                            <td className="py-3.5 px-4 align-top">
+                              <div className="space-y-1.5">
+                                {/* Dropdown Template Master */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase shrink-0">Template Master:</span>
+                                  <select
+                                    value={formItem.finishGoodId}
+                                    onChange={(e) => handleItemFieldChange(index, 'finishGoodId', e.target.value)}
+                                    className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-750 rounded text-[11px] text-zinc-700 dark:text-zinc-300 focus:ring-1 focus:ring-red-500 focus:outline-none"
+                                  >
+                                    <option value="">-- Ketik Bebas / Pilih Template Pallet --</option>
+                                    {finishGoods.map(fg => (
+                                      <option key={fg.id} value={fg.id}>
+                                        {fg.nama} (Rp {fg.hargaJual.toLocaleString('id-ID')})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                {/* Input Nama Item Pekerjaan yang Luas */}
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Ketik nama item pekerjaan / spesifikasi pallet..."
+                                  value={formItem.namaItem}
+                                  onChange={(e) => handleItemFieldChange(index, 'namaItem', e.target.value)}
+                                  className="w-full px-3.5 py-2.5 bg-white dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-700 rounded-lg text-xs md:text-sm font-bold text-zinc-900 dark:text-zinc-100 placeholder:font-normal placeholder:text-zinc-400 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all shadow-2xs"
+                                />
+                              </div>
+                            </td>
 
-                      {/* Quantity */}
-                      <div className="col-span-2 space-y-1">
-                        <label className="block text-[9px] font-bold text-zinc-400 uppercase">QTY (PCS)</label>
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          value={formItem.jumlah}
-                          onChange={(e) => handleItemFieldChange(index, 'jumlah', Math.max(1, Number(e.target.value)))}
-                          className="block w-full px-2 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded text-[11px] font-bold"
-                        />
-                      </div>
+                            {/* KOLOM TIPIFIKASI (Diperpanjang & Diperbesar) */}
+                            <td className="py-3.5 px-3 align-middle">
+                              <select
+                                value={formItem.tipeIspm}
+                                onChange={(e) => handleItemFieldChange(index, 'tipeIspm', e.target.value)}
+                                className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-700 rounded-lg text-xs md:text-sm font-bold text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-red-500 transition-all shadow-2xs cursor-pointer"
+                              >
+                                <option value="Lokal">📦 Lokal</option>
+                                <option value="Ekspor ISPM">🌐 Ekspor ISPM (HT)</option>
+                              </select>
+                            </td>
 
-                      {/* Harga Satuan */}
-                      <div className="col-span-2.5 space-y-1">
-                        <label className="block text-[9px] font-bold text-zinc-400 uppercase">HARGA (RP)</label>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          value={formItem.hargaSatuan}
-                          onChange={(e) => handleItemFieldChange(index, 'hargaSatuan', Math.max(0, Number(e.target.value)))}
-                          className="block w-full px-2 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded text-[11px] font-bold"
-                        />
-                      </div>
+                            {/* KOLOM QTY (Diperpanjang & Diperbesar) */}
+                            <td className="py-3.5 px-3 align-middle">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  required
+                                  min="1"
+                                  value={formItem.jumlah === 0 ? '' : formItem.jumlah}
+                                  onChange={(e) => handleItemFieldChange(index, 'jumlah', Math.max(0, Number(e.target.value)))}
+                                  placeholder="0"
+                                  className="w-full px-3 py-2.5 pr-9 bg-white dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-700 rounded-lg text-xs md:text-sm font-mono font-black text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-red-500 text-center transition-all shadow-2xs"
+                                />
+                                <span className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[10px] font-bold text-zinc-400 pointer-events-none uppercase">
+                                  Pcs
+                                </span>
+                              </div>
+                            </td>
 
-                      {/* Delete row */}
-                      <div className="col-span-1 flex justify-center">
-                        <button
-                          type="button"
-                          disabled={formItems.length === 1}
-                          onClick={() => handleRemoveItemRow(index)}
-                          className="p-1.5 text-zinc-400 hover:text-red-650 disabled:opacity-30 cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                            {/* KOLOM HARGA SATUAN (Diperpanjang & Diperbesar) */}
+                            <td className="py-3.5 px-3 align-middle">
+                              <div className="relative">
+                                <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-xs font-bold text-zinc-400 pointer-events-none">
+                                  Rp
+                                </span>
+                                <input
+                                  type="number"
+                                  required
+                                  min="0"
+                                  step="500"
+                                  value={formItem.hargaSatuan === 0 ? '' : formItem.hargaSatuan}
+                                  onChange={(e) => handleItemFieldChange(index, 'hargaSatuan', Math.max(0, Number(e.target.value)))}
+                                  placeholder="0"
+                                  className="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-700 rounded-lg text-xs md:text-sm font-mono font-black text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-red-500 text-right transition-all shadow-2xs"
+                                />
+                              </div>
+                            </td>
 
-                    </div>
-                  ))}
+                            {/* KOLOM SUBTOTAL (Live Calculation) */}
+                            <td className="py-3.5 px-3 text-right align-middle">
+                              <span className="text-xs md:text-sm font-mono font-black text-red-600 dark:text-red-400 block whitespace-nowrap">
+                                Rp {(formItem.jumlah * formItem.hargaSatuan).toLocaleString('id-ID')}
+                              </span>
+                            </td>
+
+                            {/* KOLOM AKSI (Duplikat & Hapus) */}
+                            <td className="py-3.5 px-2 text-center align-middle">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDuplicateItemRow(index)}
+                                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors"
+                                  title="Duplikat / Salin baris item ini"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={formItems.length === 1}
+                                  onClick={() => handleRemoveItemRow(index)}
+                                  className="p-1.5 text-zinc-400 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg disabled:opacity-20 cursor-pointer transition-colors"
+                                  title="Hapus baris item ini"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </button>
+                              </div>
+                            </td>
+
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-zinc-50 dark:bg-zinc-950/70 border-t-2 border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                        <tr>
+                          <td colSpan={3} className="py-2.5 px-4 text-zinc-500 dark:text-zinc-400">
+                            Total Item: <span className="text-zinc-900 dark:text-zinc-100 font-extrabold">{formItems.length} macam</span> ({formItems.reduce((acc, c) => acc + (Number(c.jumlah) || 0), 0)} pcs total)
+                          </td>
+                          <td colSpan={2} className="py-2.5 px-3 text-right font-bold uppercase text-[11px] text-zinc-500">
+                            Subtotal Semua Item:
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-sm text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                            Rp {formItems.reduce((acc, c) => acc + ((Number(c.jumlah) || 0) * (Number(c.hargaSatuan) || 0)), 0).toLocaleString('id-ID')}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               </div>
 
               {/* Due Date & Tax Selection */}
-              <div className="grid grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
                 <div className="space-y-1 col-span-1">
                   <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">JATUH TEMPO BAYAR</label>
                   <input
@@ -1618,7 +1737,10 @@ export const PurchaseOrderView: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <h2 className="text-2xl font-black text-zinc-800 uppercase tracking-tight">INVOICE</h2>
-                  <p className="text-xs font-mono font-bold text-red-750 mt-1">{viewingPO.nomorInvoice || 'DRAF - INVOICE BELUM TERBIT'}</p>
+                  <p className="text-xs font-mono font-bold text-red-750 mt-1">{viewingPO.nomorInvoice || (`INV/MKN/2026/08/${viewingPO.id.slice(-3)}`)}</p>
+                  {viewingPO.nomorJO && (
+                    <p className="text-[11px] font-mono font-bold text-blue-700 mt-0.5">No. JO: {viewingPO.nomorJO}</p>
+                  )}
                   <p className="text-[10px] text-zinc-500 mt-1">Tanggal: {viewingPO.tanggal}</p>
                 </div>
               </div>

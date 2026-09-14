@@ -57,7 +57,7 @@ export interface PurchaseOrder {
   namaMarketing?: string;
   totalHarga: number;
   statusPO: 'Diterima' | 'Diproduksi' | 'Siap Kirim' | 'Selesai' | 'Dibatalkan';
-  statusInvoice: 'Belum Terbit' | 'Belum Bayar' | 'Lunas';
+  statusInvoice: 'Belum Bayar' | 'Lunas' | 'Jatuh Tempo';
   tanggalJatuhTempo?: string;
   catatan?: string;
 }
