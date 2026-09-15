@@ -343,8 +343,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const unsubMaterials = onSnapshot(collection(db, 'materials'), (snap) => {
         const list = snap.docs.map(d => d.data() as Material);
-        setMaterials(list);
-        localStorage.setItem('mk_materials', JSON.stringify(list));
+        if (list.length > 0) {
+          setMaterials(list);
+          localStorage.setItem('mk_materials', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_materials');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as Material[];
+              if (localList.length > 0) {
+                setMaterials(localList);
+                localList.forEach(item => { syncToFirestore('materials', item.id, item); });
+              }
+            } catch {}
+          }
+        }
         setIsFirebaseConnected(true);
         setSyncStatus('synced');
       }, (err) => {
@@ -355,90 +368,168 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const unsubFinishGoods = onSnapshot(collection(db, 'finish_goods'), (snap) => {
         const list = snap.docs.map(d => d.data() as FinishGood);
-        setFinishGoods(list);
-        localStorage.setItem('mk_finish_goods', JSON.stringify(list));
+        if (list.length > 0) {
+          setFinishGoods(list);
+          localStorage.setItem('mk_finish_goods', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_finish_goods');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as FinishGood[];
+              if (localList.length > 0) {
+                setFinishGoods(localList);
+                localList.forEach(item => { syncToFirestore('finish_goods', item.id, item); });
+              }
+            } catch {}
+          }
+        }
       });
 
       const unsubPOs = onSnapshot(collection(db, 'purchase_orders'), (snap) => {
         const rawList = snap.docs.map(d => d.data() as PurchaseOrder);
-        const list = rawList.map(po => {
-          const terms = po.syaratPembayaran || 'Tempo 30 Hari';
-          const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
-          const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
-            ? po.tanggalJatuhTempo
-            : calculateDueDateFromInvoice(invDate, terms);
-          return {
-            ...po,
-            nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
-              ? po.nomorInvoice
-              : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
-            syaratPembayaran: terms,
-            tanggalInvoice: invDate,
-            tanggalJatuhTempo: dueDate,
-            statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
-              ? 'Belum Bayar'
-              : po.statusInvoice
-          };
-        });
-        setPurchaseOrders(list);
-        localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
+        if (rawList.length > 0) {
+          const list = rawList.map(po => {
+            const terms = po.syaratPembayaran || 'Tempo 30 Hari';
+            const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
+            const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
+              ? po.tanggalJatuhTempo
+              : calculateDueDateFromInvoice(invDate, terms);
+            return {
+              ...po,
+              nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+                ? po.nomorInvoice
+                : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+              syaratPembayaran: terms,
+              tanggalInvoice: invDate,
+              tanggalJatuhTempo: dueDate,
+              statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+                ? 'Belum Bayar'
+                : po.statusInvoice
+            };
+          });
+          setPurchaseOrders(list);
+          localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_purchase_orders');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as PurchaseOrder[];
+              if (localList.length > 0) {
+                setPurchaseOrders(localList);
+                localList.forEach(item => { syncToFirestore('purchase_orders', item.id, item); });
+              }
+            } catch {}
+          }
+        }
       });
 
       const unsubSJ = onSnapshot(collection(db, 'surat_jalan'), (snap) => {
         const list = snap.docs.map(d => d.data() as SuratJalan);
-        setSuratJalanList(list);
-        localStorage.setItem('mk_surat_jalan', JSON.stringify(list));
+        if (list.length > 0) {
+          setSuratJalanList(list);
+          localStorage.setItem('mk_surat_jalan', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_surat_jalan');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as SuratJalan[];
+              if (localList.length > 0) {
+                setSuratJalanList(localList);
+                localList.forEach(item => { syncToFirestore('surat_jalan', item.id, item); });
+              }
+            } catch {}
+          }
+        }
       });
 
       const unsubKeuangan = onSnapshot(collection(db, 'keuangan'), (snap) => {
         const list = snap.docs.map(d => d.data() as Keuangan);
-        setKeuanganList(list);
-        localStorage.setItem('mk_keuangan', JSON.stringify(list));
+        if (list.length > 0) {
+          setKeuanganList(list);
+          localStorage.setItem('mk_keuangan', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_keuangan');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as Keuangan[];
+              if (localList.length > 0) {
+                setKeuanganList(localList);
+                localList.forEach(item => { syncToFirestore('keuangan', item.id, item); });
+              }
+            } catch {}
+          }
+        }
       });
 
       const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
         const list = snap.docs.map(d => d.data() as Customer);
-        setCustomers(list);
-        localStorage.setItem('mk_customers', JSON.stringify(list));
+        if (list.length > 0) {
+          setCustomers(list);
+          localStorage.setItem('mk_customers', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_customers');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as Customer[];
+              if (localList.length > 0) {
+                setCustomers(localList);
+                localList.forEach(item => { syncToFirestore('customers', item.id, item); });
+              }
+            } catch {}
+          }
+        }
       });
 
       const unsubMarketing = onSnapshot(collection(db, 'marketing'), (snap) => {
         const list = snap.docs.map(d => d.data() as MarketingCommission);
-        setMarketingList(list);
-        localStorage.setItem('mk_marketing', JSON.stringify(list));
+        if (list.length > 0) {
+          setMarketingList(list);
+          localStorage.setItem('mk_marketing', JSON.stringify(list));
+        } else {
+          const cached = localStorage.getItem('mk_marketing');
+          if (cached) {
+            try {
+              const localList = JSON.parse(cached) as MarketingCommission[];
+              if (localList.length > 0) {
+                setMarketingList(localList);
+                localList.forEach(item => { syncToFirestore('marketing', item.id, item); });
+              }
+            } catch {}
+          }
+        }
       });
 
       const unsubHutang = onSnapshot(collection(db, 'hutang_ap'), (snap) => {
         const list = snap.docs.map(d => d.data() as HutangUsaha);
-        const data = list.length > 0 ? list : DEFAULT_HUTANG_INIT;
+        const data = list.length > 0 ? list : (localStorage.getItem('mk_hutang_ap') ? JSON.parse(localStorage.getItem('mk_hutang_ap')!) : DEFAULT_HUTANG_INIT);
         setHutangList(data);
         localStorage.setItem('mk_hutang_ap', JSON.stringify(data));
       });
 
       const unsubKasKecil = onSnapshot(collection(db, 'kas_kecil'), (snap) => {
         const list = snap.docs.map(d => d.data() as KasKecilItem);
-        const data = list.length > 0 ? list : DEFAULT_KAS_KECIL_INIT;
+        const data = list.length > 0 ? list : (localStorage.getItem('mk_kas_kecil') ? JSON.parse(localStorage.getItem('mk_kas_kecil')!) : DEFAULT_KAS_KECIL_INIT);
         setKasKecilList(data);
         localStorage.setItem('mk_kas_kecil', JSON.stringify(data));
       });
 
       const unsubBukuBank = onSnapshot(collection(db, 'buku_bank'), (snap) => {
         const list = snap.docs.map(d => d.data() as BukuBankItem);
-        const data = list.length > 0 ? list : DEFAULT_BUKU_BANK_INIT;
+        const data = list.length > 0 ? list : (localStorage.getItem('mk_buku_bank') ? JSON.parse(localStorage.getItem('mk_buku_bank')!) : DEFAULT_BUKU_BANK_INIT);
         setBukuBankList(data);
         localStorage.setItem('mk_buku_bank', JSON.stringify(data));
       });
 
       const unsubAset = onSnapshot(collection(db, 'aset_tetap'), (snap) => {
         const list = snap.docs.map(d => d.data() as AsetTetap);
-        const data = list.length > 0 ? list : DEFAULT_ASET_INIT;
+        const data = list.length > 0 ? list : (localStorage.getItem('mk_aset_tetap') ? JSON.parse(localStorage.getItem('mk_aset_tetap')!) : DEFAULT_ASET_INIT);
         setAsetList(data);
         localStorage.setItem('mk_aset_tetap', JSON.stringify(data));
       });
 
       const unsubPajak = onSnapshot(collection(db, 'pajak'), (snap) => {
         const list = snap.docs.map(d => d.data() as PajakItem);
-        const data = list.length > 0 ? list : DEFAULT_PAJAK_INIT;
+        const data = list.length > 0 ? list : (localStorage.getItem('mk_laporan_pajak') ? JSON.parse(localStorage.getItem('mk_laporan_pajak')!) : DEFAULT_PAJAK_INIT);
         setPajakList(data);
         localStorage.setItem('mk_laporan_pajak', JSON.stringify(data));
       });
