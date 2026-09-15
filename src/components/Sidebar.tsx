@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigationItems: NavItem[] = [
     { id: 'DASHBOARD', label: 'Dashboard Rekapan', icon: LayoutDashboard, roles: ['OWNER', 'FINANCE'] },
     { id: 'STOK_MATERIAL', label: 'Stok Material', icon: TreePine, roles: ['OWNER', 'WAREHOUSE', 'FINANCE'], group: 'Operasional' },
-    { id: 'STOK_JADI', label: 'Stok Finish Good', icon: Package, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES'], group: 'Operasional' },
+    { id: 'STOK_JADI', label: 'Stok Finish Good', icon: Package, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
     { id: 'PURCHASE_ORDERS', label: 'Purchase Orders', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
     { id: 'SURAT_JALAN', label: 'Surat Jalan Kirim', icon: Truck, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES'], group: 'Operasional' },
     
@@ -71,8 +71,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   if (!currentUser) return null;
 
-  // Filter navigation by role
-  const allowedItems = navigationItems.filter(item => item.roles.includes(currentUser.role));
+  // Filter navigation by role and sort by group order to keep groups contiguous
+  const allowedItems = navigationItems
+    .filter(item => item.roles.includes(currentUser.role))
+    .map(item => {
+      // For FINANCE and OWNER, put Stok Finish Good under Keuangan & Akuntansi group
+      if ((currentUser.role === 'FINANCE' || currentUser.role === 'OWNER') && item.id === 'STOK_JADI') {
+        return { ...item, group: 'Keuangan & Akuntansi' };
+      }
+      return item;
+    })
+    .sort((a, b) => {
+      const orderA = a.group === 'Operasional' ? 1 : a.group === 'Keuangan & Akuntansi' ? 2 : 0;
+      const orderB = b.group === 'Operasional' ? 1 : b.group === 'Keuangan & Akuntansi' ? 2 : 0;
+      return orderA - orderB;
+    });
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {

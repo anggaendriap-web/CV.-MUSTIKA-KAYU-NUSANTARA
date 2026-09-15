@@ -46,7 +46,8 @@ export const LaporanARView: React.FC = () => {
     return purchaseOrders
       .filter(po => po.statusInvoice !== 'Lunas')
       .map(po => {
-        const orderDate = new Date(po.tanggalOrder);
+        // Use po.tanggal instead of po.tanggalOrder
+        const orderDate = new Date(po.tanggal || new Date().toISOString());
         // Default terms 30 days
         const dueDate = new Date(orderDate);
         dueDate.setDate(dueDate.getDate() + 30);
@@ -56,7 +57,7 @@ export const LaporanARView: React.FC = () => {
         const overdueDays = Math.max(0, diffDays);
 
         let agingCategory: 'Lancar (0-30 hari)' | 'Jatuh Tempo (31-60 hari)' | 'Kritis (>60 hari)';
-        if (overdueDays === 0) {
+        if (overdueDays <= 0) {
           agingCategory = 'Lancar (0-30 hari)';
         } else if (overdueDays <= 30) {
           agingCategory = 'Jatuh Tempo (31-60 hari)';
@@ -90,8 +91,8 @@ export const LaporanARView: React.FC = () => {
       if (agingFilter === '>60') matchesAging = item.agingCategory === 'Kritis (>60 hari)';
 
       let matchesDate = true;
-      if (startDate) matchesDate = matchesDate && item.tanggalOrder >= startDate;
-      if (endDate) matchesDate = matchesDate && item.tanggalOrder <= endDate;
+      if (startDate) matchesDate = matchesDate && (item.tanggal || '') >= startDate;
+      if (endDate) matchesDate = matchesDate && (item.tanggal || '') <= endDate;
 
       return matchesSearch && matchesCust && matchesAging && matchesDate;
     });

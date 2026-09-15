@@ -14,6 +14,8 @@ export interface Material {
   nama: string; // e.g., Kayu Albasia 2x10x130
   kategori: 'Kayu Log' | 'Papan' | 'Balok' | 'Paku' | 'Cat/Pelapis' | 'Lainnya';
   stok: number;
+  stokMasuk?: number; // Total incoming stock
+  stokKeluar?: number; // Total outgoing stock (production/loss)
   satuan: 'm3' | 'pcs' | 'kg' | 'liter';
   hargaBeli: number; // IDR
   minimalStok: number;
@@ -140,12 +142,15 @@ export interface HutangUsaha {
 export interface KasKecilItem {
   id: string;
   tanggal: string;
-  kode: string; // e.g. KK-001
-  kategori: 'Konsumsi Tukang' | 'BBM & Parkir' | 'Alat Kerja Ringan' | 'Listrik & Air' | 'Kebersihan' | 'Lainnya';
+  kode?: string; // e.g. KK-001
+  kodeTransaksi?: string;
+  kategori: string;
   keterangan: string;
-  tipe: 'Masuk' | 'Keluar'; // Masuk = Pengisian kas kecil, Keluar = Pengeluaran
+  tipe?: 'Masuk' | 'Keluar'; // Masuk = Pengisian kas kecil, Keluar = Pengeluaran
+  jenis?: 'MASUK' | 'KELUAR';
   nominal: number;
-  penerimaAtauPenyetor: string;
+  penerimaAtauPenyetor?: string;
+  penerima?: string;
   buktiNota?: string;
 }
 

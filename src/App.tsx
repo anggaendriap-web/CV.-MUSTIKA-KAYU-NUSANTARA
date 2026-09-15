@@ -48,7 +48,7 @@ function AppContent() {
     if (currentUser) {
       const role = currentUser.role;
       // Define tab access limitations to gracefully redirect if role changes or if DASHBOARD is accessed by WAREHOUSE/ADMIN_SALES
-      if (role === 'FINANCE' && ['STOK_JADI', 'SURAT_JALAN'].includes(activeTab)) {
+      if (role === 'FINANCE' && ['SURAT_JALAN'].includes(activeTab)) {
         setActiveTab('DASHBOARD');
       } else if (role === 'WAREHOUSE' && (activeTab === 'DASHBOARD' || ['PURCHASE_ORDERS', 'KEUANGAN', 'INVOICE_BILLING', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab))) {
         setActiveTab('STOK_JADI');

@@ -132,12 +132,14 @@ export const MaterialView: React.FC = () => {
   const handleExportExcelMaterials = () => {
     exportToExcel<Material>(
       materials,
-      ['ID Material', 'Kode', 'Nama Material', 'Kategori', 'Stok', 'Satuan', 'Harga Beli (Rp)', 'Minimal Stok', 'Supplier'],
+      ['ID Material', 'Kode', 'Nama Material', 'Kategori', 'Stok Masuk', 'Stok Keluar (Produksi)', 'Sisa Stok', 'Satuan', 'Harga Beli (Rp)', 'Minimal Stok', 'Supplier'],
       (m) => [
         m.id,
         m.kode,
         m.nama,
         m.kategori,
+        m.stokMasuk || 0,
+        m.stokKeluar || 0,
         m.stok,
         m.satuan,
         m.hargaBeli,
@@ -235,7 +237,9 @@ export const MaterialView: React.FC = () => {
                 <th className="p-4">Kode</th>
                 <th className="p-4">Nama Bahan</th>
                 <th className="p-4">Kategori</th>
-                <th className="p-4 text-center">Stok Saat Ini</th>
+                <th className="p-4 text-center">Stok Masuk</th>
+                <th className="p-4 text-center">Dipakai (Keluar)</th>
+                <th className="p-4 text-center">Sisa Stok</th>
                 <th className="p-4 text-right">Harga Beli</th>
                 <th className="p-4">Supplier Utama</th>
                 <th className="p-4 text-right">Aksi</th>
@@ -258,6 +262,16 @@ export const MaterialView: React.FC = () => {
                     <td className="p-4">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                         {item.kategori}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {item.stokMasuk || 0} {item.satuan}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                        {item.stokKeluar || 0} {item.satuan}
                       </span>
                     </td>
                     <td className="p-4 text-center">
@@ -284,14 +298,35 @@ export const MaterialView: React.FC = () => {
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         
-                        {/* Quick Stock Adjust Button */}
+                        {/* Add Stock Button */}
                         {canModify && (
                           <button
-                            onClick={() => handleOpenAdjustModal(item)}
-                            className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
-                            title="Penyesuaian Stok"
+                            onClick={() => {
+                              setAdjustType('IN');
+                              setAdjustAmount(1);
+                              setAdjustingId(item.id);
+                              setShowAdjustModal(true);
+                            }}
+                            className="p-1.5 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg transition-all cursor-pointer"
+                            title="Catat Stok Masuk"
                           >
-                            <RefreshCcw className="h-4 w-4" />
+                            <PlusCircle className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {/* Reduce Stock Button */}
+                        {canModify && (
+                          <button
+                            onClick={() => {
+                              setAdjustType('OUT');
+                              setAdjustAmount(1);
+                              setAdjustingId(item.id);
+                              setShowAdjustModal(true);
+                            }}
+                            className="p-1.5 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all cursor-pointer"
+                            title="Catat Stok Keluar (Produksi)"
+                          >
+                            <MinusCircle className="h-4 w-4" />
                           </button>
                         )}
 
@@ -485,14 +520,18 @@ export const MaterialView: React.FC = () => {
         <div id="material-adjust-modal" className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center">
-              <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">Penyesuaian Stok Cepat</h3>
+              <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
+                {adjustType === 'IN' ? 'Catat Stok Masuk' : 'Catat Stok Keluar (Produksi)'}
+              </h3>
               <button onClick={() => setShowAdjustModal(false)} className="text-zinc-400 hover:text-zinc-650 cursor-pointer">&times;</button>
             </div>
 
             <form onSubmit={handleAdjustSubmit} className="p-5 space-y-4">
               <div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Lakukan penyesuaian cepat terhadap stok material terpilih tanpa mengubah data administrasi lainnya.
+                  {adjustType === 'IN' 
+                    ? 'Tambahkan kuantitas ke dalam stok masuk (penerimaan bahan dari supplier).' 
+                    : 'Kurangi kuantitas stok untuk penggunaan produksi.'}
                 </p>
               </div>
 
@@ -509,7 +548,7 @@ export const MaterialView: React.FC = () => {
                         : 'border-zinc-200 dark:border-zinc-800 text-zinc-600'
                     }`}
                   >
-                    Barang Masuk (+)
+                    Stok Masuk (+)
                   </button>
                   <button
                     type="button"
@@ -520,7 +559,7 @@ export const MaterialView: React.FC = () => {
                         : 'border-zinc-200 dark:border-zinc-800 text-zinc-600'
                     }`}
                   >
-                    Penyusutan / Keluar (-)
+                    Stok Keluar (Produksi) (-)
                   </button>
                 </div>
               </div>
@@ -658,15 +697,17 @@ export const MaterialView: React.FC = () => {
                         <th className="p-3">Kode</th>
                         <th className="p-3">Nama Bahan Baku</th>
                         <th className="p-3">Kategori</th>
-                        <th className="p-3 text-right">Stok Aktual</th>
-                        <th className="p-3 text-right">Harga Beli Rata-Rata</th>
+                        <th className="p-3 text-right">Masuk</th>
+                        <th className="p-3 text-right">Keluar (Prod)</th>
+                        <th className="p-3 text-right">Sisa Stok</th>
+                        <th className="p-3 text-right">Harga Beli</th>
                         <th className="p-3">Supplier Utama</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-150">
                       {materials.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-zinc-400 font-medium">
+                          <td colSpan={8} className="p-8 text-center text-zinc-400 font-medium">
                             Tidak ada data material terdaftar.
                           </td>
                         </tr>
@@ -676,6 +717,12 @@ export const MaterialView: React.FC = () => {
                             <td className="p-3 font-mono font-bold text-zinc-650">{m.kode}</td>
                             <td className="p-3 font-semibold text-zinc-900">{m.nama}</td>
                             <td className="p-3 text-zinc-600">{m.kategori}</td>
+                            <td className="p-3 text-right font-mono text-emerald-700 font-bold">
+                              {m.stokMasuk || 0} {m.satuan}
+                            </td>
+                            <td className="p-3 text-right font-mono text-red-700 font-bold">
+                              {m.stokKeluar || 0} {m.satuan}
+                            </td>
                             <td className="p-3 text-right font-mono font-black">
                               <span className={m.stok <= m.minimalStok ? 'text-red-600 font-black' : 'text-zinc-800'}>
                                 {m.stok.toLocaleString('id-ID')} {m.satuan}

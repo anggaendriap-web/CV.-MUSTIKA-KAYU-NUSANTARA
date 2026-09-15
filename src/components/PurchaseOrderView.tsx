@@ -1862,8 +1862,9 @@ export const PurchaseOrderView: React.FC = () => {
                 <div>
                   <span className="block font-bold text-zinc-400 uppercase tracking-wider text-[9px] mb-1">DITAGIHKAN KEPADA:</span>
                   <p className="font-extrabold text-sm text-zinc-800">{viewingPO.pelanggan}</p>
-                  <p className="text-zinc-500 mt-1">Gudang Logistik & Penerimaan Pembelian</p>
-                  <p className="text-zinc-500 mt-0.5">Indonesia</p>
+                  <p className="text-zinc-500 mt-1 whitespace-pre-wrap">
+                    {customers?.find(c => c.nama === viewingPO.pelanggan)?.alamat || viewingPO.tujuanPengiriman || '-'}
+                  </p>
                   {viewingPO.nomorJO && (
                     <p className="text-zinc-900 mt-2 font-mono font-bold text-[10px]">No Job Order (JO): {viewingPO.nomorJO}</p>
                   )}

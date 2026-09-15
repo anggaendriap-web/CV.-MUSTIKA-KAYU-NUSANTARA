@@ -20,7 +20,15 @@ import {
 } from 'lucide-react';
 
 export const KasKecilView: React.FC = () => {
-  const { kasKecilList, addKasKecil, deleteKasKecil, currentUser } = useApp();
+  const { 
+    kasKecilList, 
+    addKasKecil, 
+    updateKasKecil, 
+    deleteKasKecil, 
+    currentUser,
+    saldoAwalKasKecil,
+    updateSaldoAwalKasKecil
+  } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [kategoriFilter, setKategoriFilter] = useState('Semua');
@@ -32,6 +40,9 @@ export const KasKecilView: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<KasKecilItem | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showEditSaldoAwalModal, setShowEditSaldoAwalModal] = useState(false);
+  const [tempSaldoAwal, setTempSaldoAwal] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -84,7 +95,7 @@ export const KasKecilView: React.FC = () => {
     return kasKecilList.filter(i => i.jenis === 'KELUAR').reduce((a, b) => a + b.nominal, 0);
   }, [kasKecilList]);
 
-  const saldoKasKecil = totalMasuk - totalKeluar;
+  const saldoKasKecil = saldoAwalKasKecil + totalMasuk - totalKeluar;
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,12 +104,17 @@ export const KasKecilView: React.FC = () => {
       return;
     }
 
-    addKasKecil({
-      ...formData,
-      kodeTransaksi: `KK-${Math.floor(1000 + Math.random() * 9000)}`
-    });
+    if (editingId) {
+      updateKasKecil(editingId, formData);
+    } else {
+      addKasKecil({
+        ...formData,
+        kodeTransaksi: `KK-${Math.floor(1000 + Math.random() * 9000)}`
+      });
+    }
 
     setShowAddModal(false);
+    setEditingId(null);
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       kategori: 'Konsumsi & Dapur Pabrik',
@@ -107,6 +123,19 @@ export const KasKecilView: React.FC = () => {
       nominal: 0,
       penerima: ''
     });
+  };
+
+  const handleEditClick = (item: KasKecilItem) => {
+    setEditingId(item.id);
+    setFormData({
+      tanggal: item.tanggal,
+      kategori: item.kategori,
+      keterangan: item.keterangan,
+      jenis: item.jenis,
+      nominal: item.nominal,
+      penerima: item.penerimaAtauPenyetor || item.penerima || ''
+    });
+    setShowAddModal(true);
   };
 
   return (
@@ -143,10 +172,22 @@ export const KasKecilView: React.FC = () => {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider block mb-1">Saldo Kas Kecil Tersedia</span>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatRupiah(saldoKasKecil)}</div>
-          <span className="text-xs text-zinc-400 mt-1 block">Brankas kasir operasional</span>
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex justify-between items-start">
+          <div>
+            <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider block mb-1">Saldo Kas Kecil Tersedia</span>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatRupiah(saldoKasKecil)}</div>
+            <span className="text-xs text-zinc-400 mt-1 block">Brankas kasir operasional</span>
+            <span className="text-[10px] text-zinc-500 font-bold block mt-1.5">Saldo Awal: {formatRupiah(saldoAwalKasKecil)}</span>
+          </div>
+          <button
+            onClick={() => {
+              setTempSaldoAwal(String(saldoAwalKasKecil));
+              setShowEditSaldoAwalModal(true);
+            }}
+            className="text-[11px] font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/40 px-2 py-1 rounded transition-colors cursor-pointer"
+          >
+            Edit Saldo Awal
+          </button>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
@@ -260,13 +301,22 @@ export const KasKecilView: React.FC = () => {
                       {item.jenis === 'KELUAR' ? formatRupiah(item.nominal) : '-'}
                     </td>
                     <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => setItemToDelete(item)}
-                        className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                        title="Hapus Catatan"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditClick(item)}
+                          className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Catatan"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                        <button
+                          onClick={() => setItemToDelete(item)}
+                          className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Catatan"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -281,8 +331,16 @@ export const KasKecilView: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-black text-zinc-900 dark:text-white">Pencatatan Kas Kecil</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-white">
+              <h3 className="text-lg font-black text-zinc-900 dark:text-white">
+                {editingId ? 'Edit Catatan Kas Kecil' : 'Pencatatan Kas Kecil'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingId(null);
+                }} 
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -509,6 +567,59 @@ export const KasKecilView: React.FC = () => {
         }}
         onCancel={() => setItemToDelete(null)}
       />
+
+      {/* Edit Saldo Awal Modal */}
+      {showEditSaldoAwalModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50">
+              <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Edit Saldo Awal Kas Kecil</span>
+              <button
+                onClick={() => setShowEditSaldoAwalModal(false)}
+                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const num = Number(tempSaldoAwal);
+              if (!isNaN(num)) {
+                updateSaldoAwalKasKecil(num);
+                setShowEditSaldoAwalModal(false);
+              } else {
+                alert("Nilai harus berupa angka valid.");
+              }
+            }} className="p-6 space-y-4">
+              <div>
+                <label className="font-bold text-xs text-zinc-600 dark:text-zinc-400 block mb-1.5">Saldo Awal Baru (Rp)</label>
+                <input
+                  type="number"
+                  value={tempSaldoAwal}
+                  onChange={(e) => setTempSaldoAwal(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSaldoAwalModal(false)}
+                  className="px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Simpan Saldo Awal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

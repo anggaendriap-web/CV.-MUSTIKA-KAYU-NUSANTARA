@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export const InvoiceBillingView: React.FC = () => {
-  const { purchaseOrders, updateInvoiceStatus, deletePurchaseOrder, currentUser } = useApp();
+  const { purchaseOrders, updateInvoiceStatus, deletePurchaseOrder, currentUser, customers } = useApp();
   
   // Filters & Period State
   const [searchTerm, setSearchTerm] = useState('');
@@ -482,8 +482,9 @@ export const InvoiceBillingView: React.FC = () => {
                   <div>
                     <span className="block font-bold text-zinc-400 uppercase tracking-wider text-[9px] mb-1">DITAGIHKAN KEPADA:</span>
                     <p className="font-extrabold text-sm text-zinc-800">{selectedPO.pelanggan}</p>
-                    <p className="text-zinc-500 mt-1">{selectedPO.tujuanPengiriman || 'Gudang Logistik & Penerimaan Pembelian'}</p>
-                    <p className="text-zinc-500 mt-0.5">Indonesia</p>
+                    <p className="text-zinc-500 mt-1 whitespace-pre-wrap">
+                      {customers?.find(c => c.nama === selectedPO.pelanggan)?.alamat || selectedPO.tujuanPengiriman || '-'}
+                    </p>
                     {selectedPO.nomorJO && (
                       <p className="text-zinc-900 mt-2 font-mono font-bold text-[10px]">No Job Order (JO): {selectedPO.nomorJO}</p>
                     )}

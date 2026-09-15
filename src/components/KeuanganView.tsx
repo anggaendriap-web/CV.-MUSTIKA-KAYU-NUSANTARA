@@ -8,7 +8,15 @@ import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 export const KeuanganView: React.FC = () => {
-  const { keuanganList, addKeuangan, deleteKeuangan, currentUser } = useApp();
+  const { 
+    keuanganList, 
+    addKeuangan, 
+    updateKeuangan, 
+    deleteKeuangan, 
+    currentUser,
+    saldoAwalKasBesar,
+    updateSaldoAwalKasBesar
+  } = useApp();
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +30,9 @@ export const KeuanganView: React.FC = () => {
   const [printEndDate, setPrintEndDate] = useState('2026-08-31');
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Keuangan | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showEditSaldoAwalModal, setShowEditSaldoAwalModal] = useState(false);
+  const [tempSaldoAwal, setTempSaldoAwal] = useState('');
 
   // Form Fields
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
@@ -49,7 +60,7 @@ export const KeuanganView: React.FC = () => {
     .filter(tx => tx.tipe === 'Pengeluaran')
     .reduce((acc, curr) => acc + curr.nominal, 0);
 
-  const saldoBersih = totalPemasukan - totalPengeluaran;
+  const saldoBersih = saldoAwalKasBesar + totalPemasukan - totalPengeluaran;
 
   // Filter transaction list
   const filteredTx = keuanganList.filter(tx => {
@@ -85,16 +96,39 @@ export const KeuanganView: React.FC = () => {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addKeuangan({
-      tanggal,
-      tipe,
-      kategori,
-      keterangan,
-      nominal,
-      pencatat: currentUser?.name || 'Staf Keuangan',
-      metodePembayaran
-    });
+    if (editingId) {
+      updateKeuangan(editingId, {
+        tanggal,
+        tipe,
+        kategori,
+        keterangan,
+        nominal,
+        metodePembayaran
+      });
+    } else {
+      addKeuangan({
+        tanggal,
+        tipe,
+        kategori,
+        keterangan,
+        nominal,
+        pencatat: currentUser?.name || 'Staf Keuangan',
+        metodePembayaran
+      });
+    }
     setShowAddModal(false);
+    setEditingId(null);
+  };
+
+  const handleEditClick = (item: Keuangan) => {
+    setEditingId(item.id);
+    setTanggal(item.tanggal);
+    setTipe(item.tipe);
+    setKategori(item.kategori);
+    setKeterangan(item.keterangan);
+    setNominal(item.nominal);
+    setMetodePembayaran(item.metodePembayaran);
+    setShowAddModal(true);
   };
 
   const handleDeleteConfirm = () => {
@@ -207,6 +241,18 @@ export const KeuanganView: React.FC = () => {
               Rp {saldoBersih.toLocaleString('id-ID')}
             </h3>
             <span className="text-[10px] text-zinc-400 block mt-1">Dana kas aktif di bank & brankas</span>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="text-[10px] font-bold text-zinc-500">Saldo Awal: Rp {saldoAwalKasBesar.toLocaleString('id-ID')}</span>
+              <button
+                onClick={() => {
+                  setTempSaldoAwal(String(saldoAwalKasBesar));
+                  setShowEditSaldoAwalModal(true);
+                }}
+                className="text-[9px] font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded cursor-pointer"
+              >
+                Edit
+              </button>
+            </div>
           </div>
           <div className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-zinc-650 dark:text-zinc-350">
             <Wallet className="h-6 w-6" />
@@ -310,7 +356,14 @@ export const KeuanganView: React.FC = () => {
                   </td>
 
                   <td className="p-4 text-center text-zinc-500 dark:text-zinc-400 font-bold text-[10px]">{tx.pencatat}</td>
-                  <td className="p-4 text-right">
+                  <td className="p-4 text-right flex justify-end gap-1">
+                    <button
+                      onClick={() => handleEditClick(tx)}
+                      className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg cursor-pointer transition-all"
+                      title="Edit Catatan Transaksi"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                    </button>
                     <button
                       onClick={() => setDeleteTarget(tx)}
                       className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg cursor-pointer transition-all"
@@ -339,8 +392,13 @@ export const KeuanganView: React.FC = () => {
         <div id="kas-form-modal" className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-850 flex justify-between items-center">
-              <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">Catat Transaksi Buku Kas</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-650 text-xl cursor-pointer">&times;</button>
+              <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
+                {editingId ? 'Edit Transaksi Buku Kas' : 'Catat Transaksi Buku Kas'}
+              </h3>
+              <button onClick={() => {
+                setShowAddModal(false);
+                setEditingId(null);
+              }} className="text-zinc-400 hover:text-zinc-650 text-xl cursor-pointer">&times;</button>
             </div>
 
             <form onSubmit={handleFormSubmit} className="p-5 space-y-4 font-semibold">
@@ -716,6 +774,59 @@ export const KeuanganView: React.FC = () => {
         message="Apakah Anda yakin ingin menghapus catatan transaksi ini dari pembukuan kas?"
         itemName={deleteTarget ? `${deleteTarget.kodeTransaksi} - ${deleteTarget.kategori}: ${deleteTarget.tipe} (Rp ${deleteTarget.nominal.toLocaleString('id-ID')})` : ''}
       />
+
+      {/* Edit Saldo Awal Modal */}
+      {showEditSaldoAwalModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50">
+              <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Edit Saldo Awal Kas Besar</span>
+              <button
+                onClick={() => setShowEditSaldoAwalModal(false)}
+                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const num = Number(tempSaldoAwal);
+              if (!isNaN(num)) {
+                updateSaldoAwalKasBesar(num);
+                setShowEditSaldoAwalModal(false);
+              } else {
+                alert("Nilai harus berupa angka valid.");
+              }
+            }} className="p-6 space-y-4">
+              <div>
+                <label className="font-bold text-xs text-zinc-600 dark:text-zinc-400 block mb-1.5">Saldo Awal Baru (Rp)</label>
+                <input
+                  type="number"
+                  value={tempSaldoAwal}
+                  onChange={(e) => setTempSaldoAwal(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSaldoAwalModal(false)}
+                  className="px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Simpan Saldo Awal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

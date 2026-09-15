@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export const AsetDepresiasiView: React.FC = () => {
-  const { asetList, addAset, deleteAset, currentUser } = useApp();
+  const { asetList, addAset, updateAset, deleteAset, currentUser } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [kategoriFilter, setKategoriFilter] = useState('Semua');
@@ -30,6 +30,7 @@ export const AsetDepresiasiView: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<AsetTetap | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -85,16 +86,26 @@ export const AsetDepresiasiView: React.FC = () => {
     const akumulasiPenyusutan = Math.min(formData.hargaPerolehan - formData.nilaiResidu, monthsPassed * penyusutanPerBulan);
     const nilaiBukuSaatIni = formData.hargaPerolehan - akumulasiPenyusutan;
 
-    addAset({
-      ...formData,
-      kodeAset: `AST-${Math.floor(100 + Math.random() * 900)}`,
-      metodePenyusutan: 'Garis Lurus (Straight Line)',
-      penyusutanPerBulan,
-      akumulasiPenyusutan,
-      nilaiBukuSaatIni
-    });
+    if (editingId) {
+      updateAset(editingId, {
+        ...formData,
+        penyusutanPerBulan,
+        akumulasiPenyusutan,
+        nilaiBuku: nilaiBukuSaatIni
+      });
+    } else {
+      addAset({
+        ...formData,
+        kodeAset: `AST-${Math.floor(100 + Math.random() * 900)}`,
+        metodePenyusutan: 'Garis Lurus (Straight Line)',
+        penyusutanPerBulan,
+        akumulasiPenyusutan,
+        nilaiBukuSaatIni
+      });
+    }
 
     setShowAddModal(false);
+    setEditingId(null);
     setFormData({
       namaAset: '',
       kategori: 'Mesin & Peralatan Pabrik',
@@ -105,6 +116,21 @@ export const AsetDepresiasiView: React.FC = () => {
       lokasi: 'Pabrik Utama Cikarang',
       kondisi: 'Baik'
     });
+  };
+
+  const handleEditClick = (item: AsetTetap) => {
+    setEditingId(item.id);
+    setFormData({
+      namaAset: item.namaAset,
+      kategori: item.kategori,
+      tanggalPerolehan: item.tanggalPerolehan,
+      hargaPerolehan: item.hargaPerolehan,
+      masaManfaatTahun: item.masaManfaatTahun,
+      nilaiResidu: item.nilaiResidu,
+      lokasi: item.lokasi,
+      kondisi: item.kondisi || 'Baik'
+    });
+    setShowAddModal(true);
   };
 
   return (
@@ -261,13 +287,22 @@ export const AsetDepresiasiView: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => setItemToDelete(asset)}
-                        className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                        title="Hapus Aset"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditClick(asset)}
+                          className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Aset"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                        <button
+                          onClick={() => setItemToDelete(asset)}
+                          className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Aset"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -282,8 +317,16 @@ export const AsetDepresiasiView: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-lg w-full p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-black text-zinc-900 dark:text-white">Tambah Aset Tetap Baru</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-white">
+              <h3 className="text-lg font-black text-zinc-900 dark:text-white">
+                {editingId ? 'Edit Aset Tetap' : 'Tambah Aset Tetap Baru'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingId(null);
+                }} 
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>

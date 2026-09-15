@@ -41,6 +41,38 @@ interface AppContextProps {
   currentUser: User | null;
   darkMode: boolean;
   
+  // Opening Balance States & Functions
+  saldoAwalKasKecil: number;
+  saldoAwalKasBesar: number;
+  saldoAwalBukuBank: number;
+  updateSaldoAwalKasKecil: (val: number) => void;
+  updateSaldoAwalKasBesar: (val: number) => void;
+  updateSaldoAwalBukuBank: (val: number) => void;
+
+  // HPP & Beban Override States & Functions
+  useOverrideHPP: boolean;
+  overrideHPPValue: number;
+  useOverrideBeban: boolean;
+  overrideBebanValue: number;
+  updateOverrideHPP: (useOverride: boolean, val: number) => void;
+  updateOverrideBeban: (useOverride: boolean, val: number) => void;
+
+  // Equity States & Functions
+  modalDisetor: number;
+  labaDitahan: number;
+  useOverrideLabaBersih: boolean;
+  overrideLabaBersihValue: number;
+  useOverridePenyeimbang: boolean;
+  overridePenyeimbangValue: number;
+  updateEquitySettings: (
+    modalDisetor: number, 
+    labaDitahan: number, 
+    useOverride: boolean, 
+    overrideVal: number,
+    useOverridePenyeimbang?: boolean,
+    overridePenyeimbangValue?: number
+  ) => void;
+  
   // Firebase State
   isFirebaseConnected: boolean;
   syncStatus: 'synced' | 'syncing' | 'offline';
@@ -104,11 +136,14 @@ interface AppContextProps {
 
   // Kas Kecil actions
   addKasKecil: (item: Omit<KasKecilItem, 'id' | 'kode'>) => void;
+  updateKasKecil: (id: string, item: Partial<KasKecilItem>) => void;
   deleteKasKecil: (id: string) => void;
 
   // Buku Bank actions
   addBukuBank: (item: Omit<BukuBankItem, 'id' | 'kodeMutasi'>) => void;
+  updateBukuBank: (id: string, item: Partial<BukuBankItem>) => void;
   deleteBukuBank: (id: string) => void;
+  clearAllBukuBank: () => void;
 
   // Aset & Depresiasi actions
   addAset: (aset: Omit<AsetTetap, 'id' | 'kodeAset' | 'nilaiBuku' | 'penyusutanPerBulan' | 'akumulasiPenyusutan'>) => void;
@@ -258,6 +293,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return DEFAULT_PAJAK_INIT;
   });
+
+  const [saldoAwalKasKecil, setSaldoAwalKasKecil] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_saldo_awal_kas_kecil') || '0');
+  });
+  const [saldoAwalKasBesar, setSaldoAwalKasBesar] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_saldo_awal_kas_besar') || '0');
+  });
+  const [saldoAwalBukuBank, setSaldoAwalBukuBank] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_saldo_awal_buku_bank') || '0');
+  });
+
+  const [useOverrideHPP, setUseOverrideHPP] = useState<boolean>(() => {
+    return localStorage.getItem('mk_use_override_hpp') === 'true';
+  });
+  const [overrideHPPValue, setOverrideHPPValue] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_override_hpp_value') || '0');
+  });
+  const [useOverrideBeban, setUseOverrideBeban] = useState<boolean>(() => {
+    return localStorage.getItem('mk_use_override_beban') === 'true';
+  });
+  const [overrideBebanValue, setOverrideBebanValue] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_override_beban_value') || '0');
+  });
+
+  const [modalDisetor, setModalDisetor] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_modal_disetor') || '500000000');
+  });
+  const [labaDitahan, setLabaDitahan] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_laba_ditahan') || '-499000000');
+  });
+  const [useOverrideLabaBersih, setUseOverrideLabaBersih] = useState<boolean>(() => {
+    return localStorage.getItem('mk_use_override_laba_bersih') === 'true';
+  });
+  const [overrideLabaBersihValue, setOverrideLabaBersihValue] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_override_laba_bersih_value') || '145515000');
+  });
+  const [useOverridePenyeimbang, setUseOverridePenyeimbang] = useState<boolean>(() => {
+    return localStorage.getItem('mk_use_override_penyeimbang') === 'true';
+  });
+  const [overridePenyeimbangValue, setOverridePenyeimbangValue] = useState<number>(() => {
+    return Number(localStorage.getItem('mk_override_penyeimbang_value') || '-335500000');
+  });
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
@@ -549,6 +627,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Firestore passwords sync fallback:', err);
       });
 
+      const unsubFinanceSettings = onSnapshot(doc(db, 'app_config', 'finance_settings'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data) {
+            if (typeof data.saldoAwalKasKecil === 'number') {
+              setSaldoAwalKasKecil(data.saldoAwalKasKecil);
+              localStorage.setItem('mk_saldo_awal_kas_kecil', String(data.saldoAwalKasKecil));
+            }
+            if (typeof data.saldoAwalKasBesar === 'number') {
+              setSaldoAwalKasBesar(data.saldoAwalKasBesar);
+              localStorage.setItem('mk_saldo_awal_kas_besar', String(data.saldoAwalKasBesar));
+            }
+            if (typeof data.saldoAwalBukuBank === 'number') {
+              setSaldoAwalBukuBank(data.saldoAwalBukuBank);
+              localStorage.setItem('mk_saldo_awal_buku_bank', String(data.saldoAwalBukuBank));
+            }
+            if (typeof data.useOverrideHPP === 'boolean') {
+              setUseOverrideHPP(data.useOverrideHPP);
+              localStorage.setItem('mk_use_override_hpp', String(data.useOverrideHPP));
+            }
+            if (typeof data.overrideHPPValue === 'number') {
+              setOverrideHPPValue(data.overrideHPPValue);
+              localStorage.setItem('mk_override_hpp_value', String(data.overrideHPPValue));
+            }
+            if (typeof data.useOverrideBeban === 'boolean') {
+              setUseOverrideBeban(data.useOverrideBeban);
+              localStorage.setItem('mk_use_override_beban', String(data.useOverrideBeban));
+            }
+            if (typeof data.overrideBebanValue === 'number') {
+              setOverrideBebanValue(data.overrideBebanValue);
+              localStorage.setItem('mk_override_beban_value', String(data.overrideBebanValue));
+            }
+            if (typeof data.modalDisetor === 'number') {
+              setModalDisetor(data.modalDisetor);
+              localStorage.setItem('mk_modal_disetor', String(data.modalDisetor));
+            }
+            if (typeof data.labaDitahan === 'number') {
+              setLabaDitahan(data.labaDitahan);
+              localStorage.setItem('mk_laba_ditahan', String(data.labaDitahan));
+            }
+            if (typeof data.useOverrideLabaBersih === 'boolean') {
+              setUseOverrideLabaBersih(data.useOverrideLabaBersih);
+              localStorage.setItem('mk_use_override_laba_bersih', String(data.useOverrideLabaBersih));
+            }
+            if (typeof data.overrideLabaBersihValue === 'number') {
+              setOverrideLabaBersihValue(data.overrideLabaBersihValue);
+              localStorage.setItem('mk_override_laba_bersih_value', String(data.overrideLabaBersihValue));
+            }
+            if (typeof data.useOverridePenyeimbang === 'boolean') {
+              setUseOverridePenyeimbang(data.useOverridePenyeimbang);
+              localStorage.setItem('mk_use_override_penyeimbang', String(data.useOverridePenyeimbang));
+            }
+            if (typeof data.overridePenyeimbangValue === 'number') {
+              setOverridePenyeimbangValue(data.overridePenyeimbangValue);
+              localStorage.setItem('mk_override_penyeimbang_value', String(data.overridePenyeimbangValue));
+            }
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore finance_settings sync fallback:', err);
+      });
+
       isInitialSyncDone.current = true;
 
       return () => {
@@ -565,12 +705,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubAset();
         unsubPajak();
         unsubPasswords();
+        unsubFinanceSettings();
       };
     } catch (err) {
       console.warn('Firebase initialization error, using local persistence:', err);
       setIsFirebaseConnected(false);
     }
   }, []);
+
+  // Cleanup old dummy data automatically
+  useEffect(() => {
+    const dummyIds = ['1', '2', '3', '4', '5'];
+    
+    // Cleanup Buku Bank
+    if (bukuBankList.some(b => dummyIds.includes(b.id))) {
+      const cleanList = bukuBankList.filter(b => !dummyIds.includes(b.id));
+      setBukuBankList(cleanList);
+      localStorage.setItem('mk_buku_bank', JSON.stringify(cleanList));
+      dummyIds.forEach(id => deleteFromFirestore('buku_bank', id));
+    }
+    
+    // Cleanup Kas Kecil
+    if (kasKecilList.some(k => dummyIds.includes(k.id))) {
+      const cleanList = kasKecilList.filter(k => !dummyIds.includes(k.id));
+      setKasKecilList(cleanList);
+      localStorage.setItem('mk_kas_kecil', JSON.stringify(cleanList));
+      dummyIds.forEach(id => deleteFromFirestore('kas_kecil', id));
+    }
+    
+    // Cleanup Aset Tetap
+    if (asetList.some(a => dummyIds.includes(a.id))) {
+      const cleanList = asetList.filter(a => !dummyIds.includes(a.id));
+      setAsetList(cleanList);
+      localStorage.setItem('mk_aset_tetap', JSON.stringify(cleanList));
+      dummyIds.forEach(id => deleteFromFirestore('aset_tetap', id));
+    }
+    
+    // Cleanup Keuangan
+    if (keuanganList.some(k => dummyIds.includes(k.id))) {
+      const cleanList = keuanganList.filter(k => !dummyIds.includes(k.id));
+      setKeuanganList(cleanList);
+      localStorage.setItem('mk_keuangan', JSON.stringify(cleanList));
+      dummyIds.forEach(id => deleteFromFirestore('keuangan', id));
+    }
+
+    // Cleanup Hutang
+    if (hutangList.some(h => dummyIds.includes(h.id))) {
+      const cleanList = hutangList.filter(h => !dummyIds.includes(h.id));
+      setHutangList(cleanList);
+      localStorage.setItem('mk_hutang_usaha', JSON.stringify(cleanList));
+      dummyIds.forEach(id => deleteFromFirestore('hutang', id));
+    }
+
+    // Cleanup Pajak
+    if (pajakList.some(p => dummyIds.includes(p.id))) {
+      const cleanList = pajakList.filter(p => !dummyIds.includes(p.id));
+      setPajakList(cleanList);
+      localStorage.setItem('mk_laporan_pajak', JSON.stringify(cleanList));
+      dummyIds.forEach(id => deleteFromFirestore('pajak', id));
+    }
+  }, [bukuBankList, kasKecilList, asetList, keuanganList, hutangList, pajakList]);
 
   // Sync state helpers
   const saveMaterials = (newMaterials: Material[]) => {
@@ -689,6 +883,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newMat: Material = {
       ...material,
       id,
+      stokMasuk: material.stok,
+      stokKeluar: 0,
       terakhirDiperbarui: new Date().toISOString()
     };
     const updated = [newMat, ...materials];
@@ -723,9 +919,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let updatedItem: Material | null = null;
     const updated = materials.map(item => {
       if (item.id === id) {
+        const newStok = Math.max(0, item.stok + amount);
+        const stokMasuk = amount > 0 ? (item.stokMasuk || 0) + amount : (item.stokMasuk || 0);
+        const stokKeluar = amount < 0 ? (item.stokKeluar || 0) + Math.abs(amount) : (item.stokKeluar || 0);
+        
         updatedItem = {
           ...item,
-          stok: Math.max(0, item.stok + amount),
+          stok: newStok,
+          stokMasuk,
+          stokKeluar,
           terakhirDiperbarui: new Date().toISOString()
         };
         return updatedItem;
@@ -811,9 +1013,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedMaterials = materials.map(mat => {
       const cm = consumedMaterials.find(c => c.materialId === mat.id);
       if (cm) {
+        const usedAmount = cm.amount * quantity;
         const item = {
           ...mat,
-          stok: mat.stok - (cm.amount * quantity),
+          stok: mat.stok - usedAmount,
+          stokKeluar: (mat.stokKeluar || 0) + usedAmount,
           terakhirDiperbarui: new Date().toISOString()
         };
         syncToFirestore('materials', item.id, item);
@@ -872,8 +1076,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updatePurchaseOrder = (id: string, po: Partial<PurchaseOrder>) => {
     let updatedItem: PurchaseOrder | null = null;
+    let becameLunas = false;
+    let oldPo: PurchaseOrder | null = null;
+
     const updated = purchaseOrders.map(item => {
       if (item.id === id) {
+        oldPo = item;
         const effectiveTerms = po.syaratPembayaran || item.syaratPembayaran || 'Tempo 30 Hari';
         const effectiveInvDate = po.tanggalInvoice || item.tanggalInvoice || po.tanggal || item.tanggal;
         let effectiveDueDate = po.tanggalJatuhTempo || item.tanggalJatuhTempo;
@@ -881,6 +1089,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if ((po.syaratPembayaran || po.tanggalInvoice) && !po.tanggalJatuhTempo) {
           effectiveDueDate = calculateDueDateFromInvoice(effectiveInvDate, effectiveTerms);
         }
+        
+        if (po.statusInvoice === 'Lunas' && item.statusInvoice !== 'Lunas') {
+          becameLunas = true;
+        }
+
         updatedItem = {
           ...item,
           ...po,
@@ -894,6 +1107,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     savePurchaseOrders(updated);
     if (updatedItem) syncToFirestore('purchase_orders', id, updatedItem);
+
+    if (becameLunas && oldPo) {
+      const actualPo = oldPo as PurchaseOrder;
+      const idKeuangan = `trx-${Date.now()}`;
+      const kodeTransaksi = `INC-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Math.floor(100 + Math.random() * 900)}`;
+      const newKeuangan: Keuangan = {
+        id: idKeuangan,
+        kodeTransaksi,
+        tanggal: new Date().toISOString().split('T')[0],
+        tipe: 'Pemasukan',
+        kategori: 'Penjualan Pallet',
+        nominal: actualPo.totalHarga,
+        keterangan: `Pembayaran Pelunasan PO ${actualPo.nomorPO} - ${actualPo.pelanggan}`,
+        metodePembayaran: 'Transfer Bank Mandiri',
+        referensiId: actualPo.nomorPO,
+        pencatat: currentUser?.name || 'Sistem'
+      };
+      const updatedKeuangan = [newKeuangan, ...keuanganList];
+      saveKeuangan(updatedKeuangan);
+      syncToFirestore('keuangan', idKeuangan, newKeuangan);
+
+      // Automatically record in Buku Bank (Bank Mandiri)
+      const idBukuBank = `bb-${Date.now() + 1}`;
+      const kodeMutasi = `MB-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Math.floor(100 + Math.random() * 900)}`;
+      const newBukuBank: BukuBankItem = {
+        id: idBukuBank,
+        kodeMutasi,
+        tanggal: new Date().toISOString().split('T')[0],
+        bank: 'Bank Mandiri',
+        nomorRekening: '156-00-1909954-0',
+        jenis: 'MASUK',
+        tipe: 'Masuk',
+        kategori: 'Penerimaan Piutang Buyer',
+        keterangan: `Penerimaan Pelunasan PO ${actualPo.nomorPO} - ${actualPo.pelanggan}`,
+        nominal: actualPo.totalHarga,
+        referensi: actualPo.nomorPO,
+        nomorReferensi: actualPo.nomorPO
+      };
+      const updatedBukuBank = [newBukuBank, ...bukuBankList];
+      saveBukuBank(updatedBukuBank);
+      syncToFirestore('buku_bank', idBukuBank, newBukuBank);
+    }
   };
 
   const deletePurchaseOrder = (id: string) => {
@@ -929,7 +1184,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     savePurchaseOrders(updated);
 
-    // If marked as paid, automatically create income in Keuangan
+    // If marked as paid, automatically create income in Keuangan and Buku Bank
     if (status === 'Lunas' && po.statusInvoice !== 'Lunas') {
       const idKeuangan = `trx-${Date.now()}`;
       const kodeTransaksi = `INC-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Math.floor(100 + Math.random() * 900)}`;
@@ -948,6 +1203,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedKeuangan = [newKeuangan, ...keuanganList];
       saveKeuangan(updatedKeuangan);
       syncToFirestore('keuangan', idKeuangan, newKeuangan);
+
+      // Automatically record in Buku Bank (Bank Mandiri)
+      const idBukuBank = `bb-${Date.now() + 1}`;
+      const kodeMutasi = `MB-${new Date().toISOString().slice(2, 7).replace('-', '')}-${Math.floor(100 + Math.random() * 900)}`;
+      const newBukuBank: BukuBankItem = {
+        id: idBukuBank,
+        kodeMutasi,
+        tanggal: new Date().toISOString().split('T')[0],
+        bank: 'Bank Mandiri',
+        nomorRekening: '156-00-1909954-0',
+        jenis: 'MASUK',
+        tipe: 'Masuk',
+        kategori: 'Penerimaan Piutang Buyer',
+        keterangan: `Penerimaan Pelunasan PO ${po.nomorPO} - ${po.pelanggan}`,
+        nominal: po.totalHarga,
+        referensi: po.nomorPO,
+        nomorReferensi: po.nomorPO
+      };
+      const updatedBukuBank = [newBukuBank, ...bukuBankList];
+      saveBukuBank(updatedBukuBank);
+      syncToFirestore('buku_bank', idBukuBank, newBukuBank);
     }
   };
 
@@ -1227,6 +1503,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncToFirestore('kas_kecil', id, newKK);
   };
 
+  const updateKasKecil = (id: string, item: Partial<KasKecilItem>) => {
+    let updatedItem: KasKecilItem | null = null;
+    const updated = kasKecilList.map(kk => {
+      if (kk.id === id) {
+        updatedItem = { ...kk, ...item };
+        return updatedItem;
+      }
+      return kk;
+    });
+    if (updatedItem) {
+      saveKasKecil(updated);
+      syncToFirestore('kas_kecil', id, updatedItem);
+    }
+  };
+
   const deleteKasKecil = (id: string) => {
     const updated = kasKecilList.filter(item => item.id !== id);
     saveKasKecil(updated);
@@ -1247,10 +1538,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncToFirestore('buku_bank', id, newBank);
   };
 
+  const updateBukuBank = (id: string, item: Partial<BukuBankItem>) => {
+    let updatedItem: BukuBankItem | null = null;
+    const updated = bukuBankList.map(bb => {
+      if (bb.id === id) {
+        updatedItem = { ...bb, ...item };
+        return updatedItem;
+      }
+      return bb;
+    });
+    if (updatedItem) {
+      saveBukuBank(updated);
+      syncToFirestore('buku_bank', id, updatedItem);
+    }
+  };
+
   const deleteBukuBank = (id: string) => {
     const updated = bukuBankList.filter(item => item.id !== id);
     saveBukuBank(updated);
     deleteFromFirestore('buku_bank', id);
+  };
+
+  const clearAllBukuBank = () => {
+    bukuBankList.forEach(item => {
+      deleteFromFirestore('buku_bank', item.id);
+    });
+    saveBukuBank([]);
+    localStorage.setItem('mk_buku_bank', JSON.stringify([]));
   };
 
   // --- CRUD Aset & Depresiasi ---
@@ -1337,6 +1651,144 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteFromFirestore('pajak', id);
   };
 
+  const updateSaldoAwalKasKecil = (val: number) => {
+    setSaldoAwalKasKecil(val);
+    localStorage.setItem('mk_saldo_awal_kas_kecil', String(val));
+    syncToFirestore('app_config', 'finance_settings', {
+      saldoAwalKasKecil: val,
+      saldoAwalKasBesar,
+      saldoAwalBukuBank,
+      useOverrideHPP,
+      overrideHPPValue,
+      useOverrideBeban,
+      overrideBebanValue,
+      modalDisetor,
+      labaDitahan,
+      useOverrideLabaBersih,
+      overrideLabaBersihValue
+    });
+  };
+
+  const updateSaldoAwalKasBesar = (val: number) => {
+    setSaldoAwalKasBesar(val);
+    localStorage.setItem('mk_saldo_awal_kas_besar', String(val));
+    syncToFirestore('app_config', 'finance_settings', {
+      saldoAwalKasKecil,
+      saldoAwalKasBesar: val,
+      saldoAwalBukuBank,
+      useOverrideHPP,
+      overrideHPPValue,
+      useOverrideBeban,
+      overrideBebanValue,
+      modalDisetor,
+      labaDitahan,
+      useOverrideLabaBersih,
+      overrideLabaBersihValue
+    });
+  };
+
+  const updateSaldoAwalBukuBank = (val: number) => {
+    setSaldoAwalBukuBank(val);
+    localStorage.setItem('mk_saldo_awal_buku_bank', String(val));
+    syncToFirestore('app_config', 'finance_settings', {
+      saldoAwalKasKecil,
+      saldoAwalKasBesar,
+      saldoAwalBukuBank: val,
+      useOverrideHPP,
+      overrideHPPValue,
+      useOverrideBeban,
+      overrideBebanValue,
+      modalDisetor,
+      labaDitahan,
+      useOverrideLabaBersih,
+      overrideLabaBersihValue
+    });
+  };
+
+  const updateOverrideHPP = (useOverride: boolean, val: number) => {
+    setUseOverrideHPP(useOverride);
+    setOverrideHPPValue(val);
+    localStorage.setItem('mk_use_override_hpp', String(useOverride));
+    localStorage.setItem('mk_override_hpp_value', String(val));
+    syncToFirestore('app_config', 'finance_settings', {
+      saldoAwalKasKecil,
+      saldoAwalKasBesar,
+      saldoAwalBukuBank,
+      useOverrideHPP: useOverride,
+      overrideHPPValue: val,
+      useOverrideBeban,
+      overrideBebanValue,
+      modalDisetor,
+      labaDitahan,
+      useOverrideLabaBersih,
+      overrideLabaBersihValue
+    });
+  };
+
+  const updateOverrideBeban = (useOverride: boolean, val: number) => {
+    setUseOverrideBeban(useOverride);
+    setOverrideBebanValue(val);
+    localStorage.setItem('mk_use_override_beban', String(useOverride));
+    localStorage.setItem('mk_override_beban_value', String(val));
+    syncToFirestore('app_config', 'finance_settings', {
+      saldoAwalKasKecil,
+      saldoAwalKasBesar,
+      saldoAwalBukuBank,
+      useOverrideHPP,
+      overrideHPPValue,
+      useOverrideBeban: useOverride,
+      overrideBebanValue: val,
+      modalDisetor,
+      labaDitahan,
+      useOverrideLabaBersih,
+      overrideLabaBersihValue
+    });
+  };
+
+  const updateEquitySettings = (
+    newModal: number, 
+    newLabaDitahan: number, 
+    useOverride: boolean, 
+    overrideVal: number,
+    newUseOverridePenyeimbang?: boolean,
+    newOverridePenyeimbangValue?: number
+  ) => {
+    setModalDisetor(newModal);
+    setLabaDitahan(newLabaDitahan);
+    setUseOverrideLabaBersih(useOverride);
+    setOverrideLabaBersihValue(overrideVal);
+
+    if (newUseOverridePenyeimbang !== undefined) {
+      setUseOverridePenyeimbang(newUseOverridePenyeimbang);
+      localStorage.setItem('mk_use_override_penyeimbang', String(newUseOverridePenyeimbang));
+    }
+    if (newOverridePenyeimbangValue !== undefined) {
+      setOverridePenyeimbangValue(newOverridePenyeimbangValue);
+      localStorage.setItem('mk_override_penyeimbang_value', String(newOverridePenyeimbangValue));
+    }
+
+    localStorage.setItem('mk_modal_disetor', String(newModal));
+    localStorage.setItem('mk_laba_ditahan', String(newLabaDitahan));
+    localStorage.setItem('mk_use_override_laba_bersih', String(useOverride));
+    localStorage.setItem('mk_override_laba_bersih_value', String(overrideVal));
+
+    syncToFirestore('app_config', 'finance_settings', {
+      saldoAwalKasKecil,
+      saldoAwalKasBesar,
+      saldoAwalBukuBank,
+      useOverrideHPP,
+      overrideHPPValue,
+      useOverrideBeban,
+      overrideBebanValue,
+      modalDisetor: newModal,
+      labaDitahan: newLabaDitahan,
+      useOverrideLabaBersih: useOverride,
+      overrideLabaBersihValue: overrideVal,
+      useOverridePenyeimbang: newUseOverridePenyeimbang !== undefined ? newUseOverridePenyeimbang : useOverridePenyeimbang,
+      overridePenyeimbangValue: newOverridePenyeimbangValue !== undefined ? newOverridePenyeimbangValue : overridePenyeimbangValue
+    });
+  };
+
   const resetDatabase = () => {
     localStorage.setItem('mk_materials', JSON.stringify([]));
     localStorage.setItem('mk_finish_goods', JSON.stringify([]));
@@ -1381,6 +1833,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pajakList,
       currentUser,
       darkMode,
+      saldoAwalKasKecil,
+      saldoAwalKasBesar,
+      saldoAwalBukuBank,
+      updateSaldoAwalKasKecil,
+      updateSaldoAwalKasBesar,
+      updateSaldoAwalBukuBank,
+      useOverrideHPP,
+      overrideHPPValue,
+      useOverrideBeban,
+      overrideBebanValue,
+      updateOverrideHPP,
+      updateOverrideBeban,
+      modalDisetor,
+      labaDitahan,
+      useOverrideLabaBersih,
+      overrideLabaBersihValue,
+      useOverridePenyeimbang,
+      overridePenyeimbangValue,
+      updateEquitySettings,
       isFirebaseConnected,
       syncStatus,
       passwords,
@@ -1421,9 +1892,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteHutang,
       bayarHutang,
       addKasKecil,
+      updateKasKecil,
       deleteKasKecil,
       addBukuBank,
+      updateBukuBank,
       deleteBukuBank,
+      clearAllBukuBank,
       addAset,
       updateAset,
       deleteAset,

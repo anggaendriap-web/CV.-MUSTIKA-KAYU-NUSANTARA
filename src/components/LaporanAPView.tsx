@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { HutangUsaha } from '../types';
 import { CompanyLogo } from './CompanyLogo';
@@ -23,6 +23,16 @@ import {
 
 export const LaporanAPView: React.FC = () => {
   const { hutangList, addHutang, updateHutang, deleteHutang, bayarHutang, currentUser } = useApp();
+
+  // Temporary cleanup for old dummy data
+  useEffect(() => {
+    const dummyIds = ['ap-1', 'ap-2', 'ap-3'];
+    dummyIds.forEach(id => {
+      if (hutangList.some(h => h.id === id)) {
+        deleteHutang(id);
+      }
+    });
+  }, [hutangList, deleteHutang]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('Semua');
@@ -114,7 +124,7 @@ export const LaporanAPView: React.FC = () => {
       return;
     }
 
-    const nomorTagihan = formData.nomorTagihan || `AP/MKN/2026/08/${Math.floor(100 + Math.random() * 900)}`;
+    const nomorTagihan = formData.nomorTagihan || `AP-${Date.now()}`;
     addHutang({
       ...formData,
       nomorTagihan

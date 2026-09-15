@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 
 export const BukuBankView: React.FC = () => {
-  const { bukuBankList, addBukuBank, deleteBukuBank, currentUser } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [jenisFilter, setJenisFilter] = useState<'Semua' | 'MASUK' | 'KELUAR'>('Semua');
@@ -31,6 +30,10 @@ export const BukuBankView: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<BukuBankItem | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showEditSaldoAwalModal, setShowEditSaldoAwalModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [tempSaldoAwal, setTempSaldoAwal] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -43,6 +46,17 @@ export const BukuBankView: React.FC = () => {
     nominal: 0,
     referensi: ''
   });
+
+  const { 
+    bukuBankList, 
+    addBukuBank, 
+    updateBukuBank, 
+    deleteBukuBank, 
+    clearAllBukuBank,
+    currentUser,
+    saldoAwalBukuBank,
+    updateSaldoAwalBukuBank
+  } = useApp();
 
   // Default dates
   React.useEffect(() => {
@@ -79,8 +93,8 @@ export const BukuBankView: React.FC = () => {
   const totalSaldoBank = useMemo(() => {
     const masuk = bukuBankList.filter(b => b.jenis === 'MASUK' || b.tipe === 'Masuk').reduce((a, b) => a + b.nominal, 0);
     const keluar = bukuBankList.filter(b => b.jenis === 'KELUAR' || b.tipe === 'Keluar').reduce((a, b) => a + b.nominal, 0);
-    return masuk - keluar;
-  }, [bukuBankList]);
+    return saldoAwalBukuBank + masuk - keluar;
+  }, [bukuBankList, saldoAwalBukuBank]);
 
   const totalMasukKumulatif = useMemo(() => {
     return bukuBankList.filter(b => b.jenis === 'MASUK' || b.tipe === 'Masuk').reduce((a, b) => a + b.nominal, 0);
@@ -105,16 +119,24 @@ export const BukuBankView: React.FC = () => {
       return;
     }
 
-    addBukuBank({
-      ...formData,
-      bank: 'Bank Mandiri',
-      nomorRekening: '156-00-1909954-0',
-      namaBank: 'Mandiri (156-00-1909954-0)',
-      tipe: formData.jenis === 'MASUK' ? 'Masuk' : 'Keluar',
-      kodeMutasi: `BNK-${Math.floor(1000 + Math.random() * 9000)}`
-    });
+    if (editingId) {
+      updateBukuBank(editingId, {
+        ...formData,
+        tipe: formData.jenis === 'MASUK' ? 'Masuk' : 'Keluar',
+      });
+    } else {
+      addBukuBank({
+        ...formData,
+        bank: 'Bank Mandiri',
+        nomorRekening: '156-00-1909954-0',
+        namaBank: 'Mandiri (156-00-1909954-0)',
+        tipe: formData.jenis === 'MASUK' ? 'Masuk' : 'Keluar',
+        kodeMutasi: `BNK-${Math.floor(1000 + Math.random() * 9000)}`
+      });
+    }
 
     setShowAddModal(false);
+    setEditingId(null);
     setFormData({
       tanggal: new Date().toISOString().split('T')[0],
       bank: 'Bank Mandiri',
@@ -125,6 +147,21 @@ export const BukuBankView: React.FC = () => {
       nominal: 0,
       referensi: ''
     });
+  };
+
+  const handleEditClick = (item: BukuBankItem) => {
+    setEditingId(item.id);
+    setFormData({
+      tanggal: item.tanggal,
+      bank: item.bank,
+      nomorRekening: item.nomorRekening,
+      jenis: item.jenis || (item.tipe === 'Masuk' ? 'MASUK' : 'KELUAR'),
+      kategori: item.kategori,
+      keterangan: item.keterangan,
+      nominal: item.nominal,
+      referensi: item.referensi || ''
+    });
+    setShowAddModal(true);
   };
 
   return (
@@ -141,7 +178,17 @@ export const BukuBankView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => {
+              setTempSaldoAwal(String(saldoAwalBukuBank));
+              setShowEditSaldoAwalModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+            <span>Atur Saldo Awal Giro</span>
+          </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
@@ -161,13 +208,27 @@ export const BukuBankView: React.FC = () => {
 
       {/* Account Balance Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-amber-200 dark:border-amber-900/50 shadow-sm bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/20 dark:to-zinc-900">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Bank Mandiri (156-00-1909954-0)</span>
-            <Building className="h-4 w-4 text-amber-600" />
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-amber-200 dark:border-amber-900/50 shadow-sm bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/20 dark:to-zinc-900 flex justify-between items-start">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Bank Mandiri (156-00-1909954-0)</span>
+            </div>
+            <div className="text-2xl font-black text-zinc-900 dark:text-white">{formatRupiah(totalSaldoBank)}</div>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 block font-medium">a.n CV MUSTIKA KAYU NUSANTARA</span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[10px] text-zinc-500 font-bold">Saldo Awal: {formatRupiah(saldoAwalBukuBank)}</span>
+              <button
+                onClick={() => {
+                  setTempSaldoAwal(String(saldoAwalBukuBank));
+                  setShowEditSaldoAwalModal(true);
+                }}
+                className="text-[9px] font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+              >
+                Edit
+              </button>
+            </div>
           </div>
-          <div className="text-2xl font-black text-zinc-900 dark:text-white">{formatRupiah(totalSaldoBank)}</div>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 block font-medium">a.n CV MUSTIKA KAYU NUSANTARA</span>
+          <Building className="h-5 w-5 text-amber-600 shrink-0" />
         </div>
 
         <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
@@ -239,8 +300,16 @@ export const BukuBankView: React.FC = () => {
 
       {/* Transactions Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-2">
           <span className="font-bold text-sm text-zinc-900 dark:text-white">Mutasi Rekening Koran ({filteredList.length})</span>
+          {bukuBankList.length > 0 && (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="px-3 py-1.5 text-xs font-bold text-red-600 hover:text-white border border-red-200 dark:border-red-900/50 hover:bg-red-600 rounded-lg cursor-pointer transition-all"
+            >
+              Hapus Semua Mutasi Bank (Reset)
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -288,13 +357,22 @@ export const BukuBankView: React.FC = () => {
                       {item.jenis === 'KELUAR' || item.tipe === 'Keluar' ? formatRupiah(item.nominal) : '-'}
                     </td>
                     <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => setItemToDelete(item)}
-                        className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                        title="Hapus Mutasi"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditClick(item)}
+                          className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Catatan"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                        <button
+                          onClick={() => setItemToDelete(item)}
+                          className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Mutasi"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -309,8 +387,16 @@ export const BukuBankView: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-black text-zinc-900 dark:text-white">Catat Mutasi Bank Mandiri</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-white">
+              <h3 className="text-lg font-black text-zinc-900 dark:text-white">
+                {editingId ? 'Edit Mutasi Bank Mandiri' : 'Catat Mutasi Bank Mandiri'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingId(null);
+                }} 
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -540,6 +626,104 @@ export const BukuBankView: React.FC = () => {
         }}
         onCancel={() => setItemToDelete(null)}
       />
+
+      {/* Edit Saldo Awal Modal */}
+      {showEditSaldoAwalModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50">
+              <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Edit Saldo Awal Bank Mandiri</span>
+              <button
+                onClick={() => setShowEditSaldoAwalModal(false)}
+                className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const num = Number(tempSaldoAwal);
+              if (!isNaN(num)) {
+                updateSaldoAwalBukuBank(num);
+                setShowEditSaldoAwalModal(false);
+              } else {
+                alert("Nilai harus berupa angka valid.");
+              }
+            }} className="p-6 space-y-4">
+              <div>
+                <label className="font-bold text-xs text-zinc-600 dark:text-zinc-400 block mb-1.5">Saldo Awal Baru (Rp)</label>
+                <input
+                  type="number"
+                  value={tempSaldoAwal}
+                  onChange={(e) => setTempSaldoAwal(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-600 font-mono"
+                  placeholder="0"
+                  required
+                />
+                {tempSaldoAwal && !isNaN(Number(tempSaldoAwal)) && (
+                  <p className="mt-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                    Format: {formatRupiah(Number(tempSaldoAwal))}
+                  </p>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSaldoAwalModal(false)}
+                  className="px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Simpan Saldo Awal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Mutasi Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-red-50 dark:border-red-950 flex items-center justify-between bg-red-50/50 dark:bg-red-950/20">
+              <span className="font-extrabold text-sm text-red-600 dark:text-red-400">Hapus Semua Mutasi Bank</span>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                Apakah Anda yakin ingin <strong className="text-red-600">menghapus seluruh catatan transaksi/mutasi bank</strong>? Tindakan ini akan mengosongkan semua riwayat rekening koran Bank Mandiri Anda secara permanen di server dan tidak dapat dibatalkan.
+              </p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    clearAllBukuBank();
+                    setShowResetConfirm(false);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Ya, Hapus Semua Mutasi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
