@@ -238,190 +238,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Setup Real-time Firestore Subscriptions for all collections
     try {
       const unsubMaterials = onSnapshot(collection(db, 'materials'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as Material);
-          setMaterials(list);
-          localStorage.setItem('mk_materials', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_materials');
-          if (cached) setMaterials(JSON.parse(cached));
-        }
+        const list = snap.docs.map(d => d.data() as Material);
+        setMaterials(list);
+        localStorage.setItem('mk_materials', JSON.stringify(list));
         setIsFirebaseConnected(true);
         setSyncStatus('synced');
       }, (err) => {
         console.warn('Firestore materials sync fallback:', err);
         setIsFirebaseConnected(false);
+        setSyncStatus('offline');
       });
 
       const unsubFinishGoods = onSnapshot(collection(db, 'finish_goods'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as FinishGood);
-          setFinishGoods(list);
-          localStorage.setItem('mk_finish_goods', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_finish_goods');
-          if (cached) setFinishGoods(JSON.parse(cached));
-        }
+        const list = snap.docs.map(d => d.data() as FinishGood);
+        setFinishGoods(list);
+        localStorage.setItem('mk_finish_goods', JSON.stringify(list));
       });
 
       const unsubPOs = onSnapshot(collection(db, 'purchase_orders'), (snap) => {
-        if (!snap.empty) {
-          const rawList = snap.docs.map(d => d.data() as PurchaseOrder);
-          const list = rawList.map(po => {
-            const terms = po.syaratPembayaran || 'Tempo 30 Hari';
-            const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
-            const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
-              ? po.tanggalJatuhTempo
-              : calculateDueDateFromInvoice(invDate, terms);
-            return {
-              ...po,
-              nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
-                ? po.nomorInvoice
-                : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
-              syaratPembayaran: terms,
-              tanggalInvoice: invDate,
-              tanggalJatuhTempo: dueDate,
-              statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
-                ? 'Belum Bayar'
-                : po.statusInvoice
-            };
-          });
-          setPurchaseOrders(list);
-          localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_purchase_orders');
-          if (cached) {
-            try {
-              const rawList = JSON.parse(cached) as PurchaseOrder[];
-              const list = rawList.map(po => {
-                const terms = po.syaratPembayaran || 'Tempo 30 Hari';
-                const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
-                const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
-                  ? po.tanggalJatuhTempo
-                  : calculateDueDateFromInvoice(invDate, terms);
-                return {
-                  ...po,
-                  nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
-                    ? po.nomorInvoice
-                    : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
-                  syaratPembayaran: terms,
-                  tanggalInvoice: invDate,
-                  tanggalJatuhTempo: dueDate,
-                  statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
-                    ? 'Belum Bayar'
-                    : po.statusInvoice
-                };
-              });
-              setPurchaseOrders(list);
-            } catch (e) {
-              // ignore
-            }
-          }
-        }
+        const rawList = snap.docs.map(d => d.data() as PurchaseOrder);
+        const list = rawList.map(po => {
+          const terms = po.syaratPembayaran || 'Tempo 30 Hari';
+          const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
+          const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
+            ? po.tanggalJatuhTempo
+            : calculateDueDateFromInvoice(invDate, terms);
+          return {
+            ...po,
+            nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+              ? po.nomorInvoice
+              : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+            syaratPembayaran: terms,
+            tanggalInvoice: invDate,
+            tanggalJatuhTempo: dueDate,
+            statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+              ? 'Belum Bayar'
+              : po.statusInvoice
+          };
+        });
+        setPurchaseOrders(list);
+        localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
       });
 
       const unsubSJ = onSnapshot(collection(db, 'surat_jalan'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as SuratJalan);
-          setSuratJalanList(list);
-          localStorage.setItem('mk_surat_jalan', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_surat_jalan');
-          if (cached) setSuratJalanList(JSON.parse(cached));
-        }
+        const list = snap.docs.map(d => d.data() as SuratJalan);
+        setSuratJalanList(list);
+        localStorage.setItem('mk_surat_jalan', JSON.stringify(list));
       });
 
       const unsubKeuangan = onSnapshot(collection(db, 'keuangan'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as Keuangan);
-          setKeuanganList(list);
-          localStorage.setItem('mk_keuangan', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_keuangan');
-          if (cached) setKeuanganList(JSON.parse(cached));
-        }
+        const list = snap.docs.map(d => d.data() as Keuangan);
+        setKeuanganList(list);
+        localStorage.setItem('mk_keuangan', JSON.stringify(list));
       });
 
       const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as Customer);
-          setCustomers(list);
-          localStorage.setItem('mk_customers', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_customers');
-          if (cached) setCustomers(JSON.parse(cached));
-        }
+        const list = snap.docs.map(d => d.data() as Customer);
+        setCustomers(list);
+        localStorage.setItem('mk_customers', JSON.stringify(list));
       });
 
       const unsubMarketing = onSnapshot(collection(db, 'marketing'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as MarketingCommission);
-          setMarketingList(list);
-          localStorage.setItem('mk_marketing', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_marketing');
-          if (cached) setMarketingList(JSON.parse(cached));
-        }
+        const list = snap.docs.map(d => d.data() as MarketingCommission);
+        setMarketingList(list);
+        localStorage.setItem('mk_marketing', JSON.stringify(list));
       });
 
       const unsubHutang = onSnapshot(collection(db, 'hutang_ap'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as HutangUsaha);
-          setHutangList(list);
-          localStorage.setItem('mk_hutang_ap', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_hutang_ap');
-          const data = cached ? JSON.parse(cached) : DEFAULT_HUTANG_INIT;
-          setHutangList(data);
-        }
+        const list = snap.docs.map(d => d.data() as HutangUsaha);
+        const data = list.length > 0 ? list : DEFAULT_HUTANG_INIT;
+        setHutangList(data);
+        localStorage.setItem('mk_hutang_ap', JSON.stringify(data));
       });
 
       const unsubKasKecil = onSnapshot(collection(db, 'kas_kecil'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as KasKecilItem);
-          setKasKecilList(list);
-          localStorage.setItem('mk_kas_kecil', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_kas_kecil');
-          const data = cached ? JSON.parse(cached) : DEFAULT_KAS_KECIL_INIT;
-          setKasKecilList(data);
-        }
+        const list = snap.docs.map(d => d.data() as KasKecilItem);
+        const data = list.length > 0 ? list : DEFAULT_KAS_KECIL_INIT;
+        setKasKecilList(data);
+        localStorage.setItem('mk_kas_kecil', JSON.stringify(data));
       });
 
       const unsubBukuBank = onSnapshot(collection(db, 'buku_bank'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as BukuBankItem);
-          setBukuBankList(list);
-          localStorage.setItem('mk_buku_bank', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_buku_bank');
-          const data = cached ? JSON.parse(cached) : DEFAULT_BUKU_BANK_INIT;
-          setBukuBankList(data);
-        }
+        const list = snap.docs.map(d => d.data() as BukuBankItem);
+        const data = list.length > 0 ? list : DEFAULT_BUKU_BANK_INIT;
+        setBukuBankList(data);
+        localStorage.setItem('mk_buku_bank', JSON.stringify(data));
       });
 
       const unsubAset = onSnapshot(collection(db, 'aset_tetap'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as AsetTetap);
-          setAsetList(list);
-          localStorage.setItem('mk_aset_tetap', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_aset_tetap');
-          const data = cached ? JSON.parse(cached) : DEFAULT_ASET_INIT;
-          setAsetList(data);
-        }
+        const list = snap.docs.map(d => d.data() as AsetTetap);
+        const data = list.length > 0 ? list : DEFAULT_ASET_INIT;
+        setAsetList(data);
+        localStorage.setItem('mk_aset_tetap', JSON.stringify(data));
       });
 
       const unsubPajak = onSnapshot(collection(db, 'pajak'), (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => d.data() as PajakItem);
-          setPajakList(list);
-          localStorage.setItem('mk_laporan_pajak', JSON.stringify(list));
-        } else if (!isInitialSyncDone.current) {
-          const cached = localStorage.getItem('mk_laporan_pajak');
-          const data = cached ? JSON.parse(cached) : DEFAULT_PAJAK_INIT;
-          setPajakList(data);
-        }
+        const list = snap.docs.map(d => d.data() as PajakItem);
+        const data = list.length > 0 ? list : DEFAULT_PAJAK_INIT;
+        setPajakList(data);
+        localStorage.setItem('mk_laporan_pajak', JSON.stringify(data));
       });
 
       const unsubPasswords = onSnapshot(doc(db, 'app_config', 'passwords'), (docSnap) => {
