@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { SuratJalan, PurchaseOrder } from '../types';
 import { CompanyLogo } from './CompanyLogo';
-import { Plus, Search, Truck, Eye, Printer, Trash2, CheckCircle2, ChevronRight, User, Download, X } from 'lucide-react';
+import { Plus, Search, Truck, Eye, Printer, Trash2, CheckCircle2, ChevronRight, User, Download, X, Edit3 } from 'lucide-react';
 import { exportToExcel } from '../utils/exportExcel';
 import { downloadElementAsPdf, triggerPrintOrPdf, showPdfToast } from '../utils/exportPdf';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
@@ -40,6 +40,7 @@ export const SuratJalanView: React.FC = () => {
   const [platNomor, setPlatNomor] = useState('');
   const [jenisKendaraan, setJenisKendaraan] = useState<SuratJalan['jenisKendaraan']>('Colt Diesel');
   const [catatanKirim, setCatatanKirim] = useState('');
+  const [formItems, setFormItems] = useState<{ namaPallet: string; jumlahKirim: number; satuan: string; maxQty: number; sisaQty: number }[]>([]);
 
   // Status Change State
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -51,6 +52,47 @@ export const SuratJalanView: React.FC = () => {
 
   // Get eligible POs for delivering (PO having status Diterima, Diproduksi, or Siap Kirim)
   const eligiblePOs = purchaseOrders.filter(po => po.statusPO !== 'Selesai' && po.statusPO !== 'Dibatalkan');
+
+  // Helper to calculate total already delivered for a given PO item
+  const getDeliveredQtyForPOItem = (poId: string, itemName: string, excludeSjId?: string | null) => {
+    let total = 0;
+    suratJalanList.forEach(sj => {
+      if (sj.purchaseOrderId === poId && (!excludeSjId || sj.id !== excludeSjId)) {
+        sj.itemKirim.forEach(it => {
+          if (it.namaPallet === itemName) {
+            total += it.jumlahKirim;
+          }
+        });
+      }
+    });
+    return total;
+  };
+
+  // When selectedPOId changes in form modal, re-populate formItems with remaining quantities
+  useEffect(() => {
+    if (!selectedPOId) return;
+    const po = purchaseOrders.find(p => p.id === selectedPOId);
+    if (!po) return;
+
+    if (!editingId) {
+      const newItems = po.item.map(i => {
+        const alreadyDelivered = getDeliveredQtyForPOItem(po.id, i.namaPallet, null);
+        const sisa = Math.max(0, i.jumlah - alreadyDelivered);
+        return {
+          namaPallet: i.namaPallet,
+          jumlahKirim: sisa,
+          satuan: 'pcs',
+          maxQty: i.jumlah,
+          sisaQty: sisa
+        };
+      });
+      setFormItems(newItems);
+      if (!nomorSuratJalan) {
+        const count = suratJalanList.length + 1;
+        setNomorSuratJalan(`SJ-${new Date().getFullYear()}-${String(count).padStart(3, '0')}`);
+      }
+    }
+  }, [selectedPOId, editingId, purchaseOrders]);
 
   // Filter & Search
   const filteredSJ = suratJalanList.filter(sj => {
@@ -68,13 +110,53 @@ export const SuratJalanView: React.FC = () => {
       return;
     }
     setEditingId(null);
-    setSelectedPOId(eligiblePOs[0].id);
-    setNomorSuratJalan('');
+    const defaultPO = eligiblePOs[0];
+    setSelectedPOId(defaultPO.id);
+    setNomorSuratJalan(`SJ-${new Date().getFullYear()}-${String(suratJalanList.length + 1).padStart(3, '0')}`);
     setTanggalKirim(new Date().toISOString().split('T')[0]);
     setNamaSopir('');
     setPlatNomor('');
     setJenisKendaraan('Colt Diesel');
     setCatatanKirim('');
+    setShowFormModal(true);
+  };
+
+  const handleOpenEditModal = (sj: SuratJalan) => {
+    setEditingId(sj.id);
+    setSelectedPOId(sj.purchaseOrderId);
+    setNomorSuratJalan(sj.nomorSuratJalan);
+    setTanggalKirim(sj.tanggalKirim);
+    setNamaSopir(sj.namaSopir);
+    setPlatNomor(sj.platNomor);
+    setJenisKendaraan(sj.jenisKendaraan);
+    setCatatanKirim(sj.catatanKirim || '');
+
+    const po = purchaseOrders.find(p => p.id === sj.purchaseOrderId);
+    if (po) {
+      const itemsWithSisa = po.item.map(i => {
+        const existingItem = sj.itemKirim.find(it => it.namaPallet === i.namaPallet);
+        const qtyKirimVal = existingItem ? existingItem.jumlahKirim : 0;
+        const deliveredByOthers = getDeliveredQtyForPOItem(po.id, i.namaPallet, sj.id);
+        const sisa = Math.max(0, i.jumlah - deliveredByOthers);
+        return {
+          namaPallet: i.namaPallet,
+          jumlahKirim: qtyKirimVal,
+          satuan: 'pcs',
+          maxQty: i.jumlah,
+          sisaQty: sisa
+        };
+      });
+      setFormItems(itemsWithSisa);
+    } else {
+      setFormItems(sj.itemKirim.map(it => ({
+        namaPallet: it.namaPallet,
+        jumlahKirim: it.jumlahKirim,
+        satuan: it.satuan || 'pcs',
+        maxQty: it.jumlahKirim,
+        sisaQty: it.jumlahKirim
+      })));
+    }
+
     setShowFormModal(true);
   };
 
@@ -84,11 +166,10 @@ export const SuratJalanView: React.FC = () => {
     const po = purchaseOrders.find(p => p.id === selectedPOId);
     if (!po) return;
 
-    // Create item list from PO items
-    const items = po.item.map(i => ({
+    const items = formItems.map(i => ({
       namaPallet: i.namaPallet,
-      jumlahKirim: i.jumlah,
-      satuan: 'pcs'
+      jumlahKirim: Number(i.jumlahKirim) || 0,
+      satuan: i.satuan || 'pcs'
     }));
 
     if (editingId) {
@@ -97,8 +178,10 @@ export const SuratJalanView: React.FC = () => {
         namaSopir,
         platNomor,
         jenisKendaraan,
-        catatanKirim
+        catatanKirim,
+        itemKirim: items
       });
+      showPdfToast(`Surat Jalan "${nomorSuratJalan}" berhasil diperbarui.`);
     } else {
       addSuratJalan({
         nomorSuratJalan,
@@ -113,6 +196,7 @@ export const SuratJalanView: React.FC = () => {
         statusPengiriman: 'Draf',
         catatanKirim
       });
+      showPdfToast(`Surat Jalan "${nomorSuratJalan}" berhasil diterbitkan.`);
     }
 
     setShowFormModal(false);
@@ -279,6 +363,17 @@ export const SuratJalanView: React.FC = () => {
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       
+                      {/* Edit Surat Jalan */}
+                      {canModify && (
+                        <button
+                          onClick={() => handleOpenEditModal(sj)}
+                          className="p-1.5 text-zinc-400 hover:text-blue-600 dark:text-zinc-400 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                          title="Edit Surat Jalan & Qty"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                      )}
+
                       {/* Printable View */}
                       <button
                         onClick={() => {
@@ -348,10 +443,52 @@ export const SuratJalanView: React.FC = () => {
                 >
                   {eligiblePOs.map(po => (
                     <option key={po.id} value={po.id}>
-                      {po.pelanggan} - {po.nomorPO} ({po.item[0]?.jumlah} pcs)
+                      {po.pelanggan} - {po.nomorPO} ({po.item.reduce((s, i) => s + i.jumlah, 0)} pcs total)
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Items & Qty Delivery Management with Sisa Qty Info */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/50 dark:border-zinc-850 space-y-3">
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] font-extrabold text-zinc-400 uppercase">Item Pallet & Qty Dikirim (Info Sisa PO)</p>
+                  <span className="text-[10px] text-red-600 font-bold">Edit Qty Terkirim</span>
+                </div>
+
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {formItems.map((item, idx) => (
+                    <div key={idx} className="p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100 truncate">{item.namaPallet}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-[10px] text-zinc-400">Total PO: <strong className="text-zinc-700 dark:text-zinc-300">{item.maxQty} {item.satuan}</strong></span>
+                          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                            Sisa Belum Dikirim: {item.sisaQty} {item.satuan}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-28 flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.maxQty}
+                          required
+                          value={item.jumlahKirim}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            const updated = [...formItems];
+                            updated[idx].jumlahKirim = val;
+                            setFormItems(updated);
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs font-bold text-center text-red-600"
+                        />
+                        <span className="text-[10px] font-bold text-zinc-400">{item.satuan}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
