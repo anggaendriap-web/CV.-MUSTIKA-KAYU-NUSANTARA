@@ -55,6 +55,7 @@ export interface PurchaseOrder {
     jumlah: number;
     hargaSatuan: number;
     subtotal: number;
+    jumlahInvoice?: number; // Qty yang akan dicetak di Invoice
   }[];
   subtotalHarga?: number; // Before tax
   tipePajak?: 'PPN' | 'Non PPN' | 'PPh' | 'PPN & PPh';

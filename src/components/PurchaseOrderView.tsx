@@ -1877,36 +1877,79 @@ export const PurchaseOrderView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Status Notice if Partial Billing */}
+              {(() => {
+                const totalPoQty = (viewingPO.item || []).reduce((acc, i) => acc + (Number(i.jumlah) || 0), 0);
+                const totalInvQty = (viewingPO.item || []).reduce((acc, i) => acc + (typeof i.jumlahInvoice === 'number' ? i.jumlahInvoice : (Number(i.jumlah) || 0)), 0);
+                const totalSisa = Math.max(0, totalPoQty - totalInvQty);
+                if (totalSisa > 0) {
+                  return (
+                    <div className="mb-6 p-2.5 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 font-black rounded text-[9px] uppercase tracking-wider">
+                          TAGIHAN TAHAP / PARSIAL
+                        </span>
+                        <span>
+                          Invoice ini menagihkan <b>{totalInvQty} pcs</b> dari total pesanan PO <b>{totalPoQty} pcs</b>.
+                        </span>
+                      </div>
+                      <span className="font-bold text-amber-800">
+                        Sisa Belum Ditagih: {totalSisa} pcs
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Items Table */}
               <table className="w-full text-xs text-left border-collapse mb-8">
                 <thead>
                   <tr className="bg-zinc-100 border-b border-zinc-200">
                     <th className="p-3 font-bold uppercase text-[10px]">Deskripsi Barang / Item Pekerjaan</th>
                     <th className="p-3 text-center font-bold uppercase text-[10px]">Sertifikasi ISPM</th>
-                    <th className="p-3 text-right font-bold uppercase text-[10px]">Kuantitas</th>
+                    <th className="p-3 text-right font-bold uppercase text-[10px]">Kuantitas Tagihan</th>
                     <th className="p-3 text-right font-bold uppercase text-[10px]">Harga Satuan</th>
                     <th className="p-3 text-right font-bold uppercase text-[10px]">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
-                  {(viewingPO.item || []).map((item, idx) => (
-                    <tr key={idx}>
-                      <td className="p-3">
-                        <p className="font-bold text-zinc-800">{item.namaPallet}</p>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">Sertifikasi oven, anti-rayap terlapisi penuh</p>
-                      </td>
-                      <td className="p-3 text-center text-zinc-600 font-bold">{item.tipeIspm || 'Lokal'}</td>
-                      <td className="p-3 text-right font-bold">{item.jumlah} pcs</td>
-                      <td className="p-3 text-right">Rp {item.hargaSatuan.toLocaleString('id-ID')}</td>
-                      <td className="p-3 text-right font-bold">Rp {item.subtotal.toLocaleString('id-ID')}</td>
-                    </tr>
-                  ))}
+                  {(viewingPO.item || []).map((item, idx) => {
+                    const poQty = Number(item.jumlah) || 0;
+                    const invoiceQty = typeof item.jumlahInvoice === 'number' ? item.jumlahInvoice : poQty;
+                    const sisaQty = Math.max(0, poQty - invoiceQty);
+                    const isPartial = invoiceQty < poQty;
+                    const subtotal = invoiceQty * item.hargaSatuan;
+
+                    return (
+                      <tr key={idx}>
+                        <td className="p-3">
+                          <p className="font-bold text-zinc-800">{item.namaPallet || (item as any).namaItem}</p>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">Sertifikasi oven, anti-rayap terlapisi penuh</p>
+                          {isPartial && (
+                            <p className="text-[10px] text-amber-700 font-semibold mt-0.5">
+                              *Tagihan sebagian: {invoiceQty} dari {poQty} pcs (Sisa PO: {sisaQty} pcs)
+                            </p>
+                          )}
+                        </td>
+                        <td className="p-3 text-center text-zinc-600 font-bold">{item.tipeIspm || 'Lokal'}</td>
+                        <td className="p-3 text-right font-bold">
+                          {invoiceQty} pcs
+                          {isPartial && (
+                            <span className="block text-[9px] font-normal text-zinc-400">(PO: {poQty})</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">Rp {item.hargaSatuan.toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-right font-bold">Rp {subtotal.toLocaleString('id-ID')}</td>
+                      </tr>
+                    );
+                  })}
                   
                   {/* Subtotal Neto, PPN, PPh breakdowns */}
                   <tr className="border-t border-zinc-300">
                     <td colSpan={3} className="p-2 text-right text-[10px] uppercase text-zinc-400 font-bold">Neto Sebelum Pajak:</td>
                     <td colSpan={2} className="p-2 text-right font-mono text-zinc-800 font-bold">
-                      Rp {(viewingPO.subtotalHarga || (viewingPO.item || []).reduce((acc, c) => acc + c.subtotal, 0)).toLocaleString('id-ID')}
+                      Rp {(viewingPO.subtotalHarga || (viewingPO.item || []).reduce((acc, c) => acc + ((typeof c.jumlahInvoice === 'number' ? c.jumlahInvoice : c.jumlah) * c.hargaSatuan), 0)).toLocaleString('id-ID')}
                     </td>
                   </tr>
 
