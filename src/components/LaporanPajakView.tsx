@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export const LaporanPajakView: React.FC = () => {
-  const { pajakList, addPajak, updatePajak, deletePajak, currentUser, purchaseOrders, hutangList } = useApp();
+  const { pajakList, addPajak, updatePajak, deletePajak, currentUser, purchaseOrders, hutangList, deletedTaxIds } = useApp();
 
   // Period filter states
   const [periodPreset, setPeriodPreset] = useState<'ALL' | 'THIS_MONTH' | 'LAST_MONTH' | 'THIS_QUARTER' | 'THIS_YEAR' | 'SPECIFIC_MONTH' | 'CUSTOM'>('ALL');
@@ -169,10 +169,11 @@ export const LaporanPajakView: React.FC = () => {
     return items;
   }, [purchaseOrders]);
 
-  // Combined Pajak List (Manual + Auto PO)
+  // Combined Pajak List (Manual + Auto PO), filtering out deleted virtual/manual items
   const combinedPajakList = useMemo(() => {
-    return [...pajakList, ...virtualPajakItems];
-  }, [pajakList, virtualPajakItems]);
+    const deletedSet = new Set(deletedTaxIds || []);
+    return [...pajakList, ...virtualPajakItems].filter(item => !deletedSet.has(item.id));
+  }, [pajakList, virtualPajakItems, deletedTaxIds]);
 
   // Filtered Tax records based on search, category, status, and DATE/PERIOD
   const filteredPajak = useMemo(() => {

@@ -24,16 +24,6 @@ import {
 export const LaporanAPView: React.FC = () => {
   const { hutangList, addHutang, updateHutang, deleteHutang, bayarHutang, currentUser } = useApp();
 
-  // Temporary cleanup for old dummy data
-  useEffect(() => {
-    const dummyIds = ['ap-1', 'ap-2', 'ap-3'];
-    dummyIds.forEach(id => {
-      if (hutangList.some(h => h.id === id)) {
-        deleteHutang(id);
-      }
-    });
-  }, [hutangList, deleteHutang]);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('Semua');
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Belum Lunas' | 'Lunas' | 'Jatuh Tempo'>('Semua');

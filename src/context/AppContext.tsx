@@ -15,13 +15,6 @@ import {
   AsetTetap,
   PajakItem
 } from '../types';
-import {
-  DEFAULT_HUTANG_INIT,
-  DEFAULT_KAS_KECIL_INIT,
-  DEFAULT_BUKU_BANK_INIT,
-  DEFAULT_ASET_INIT,
-  DEFAULT_PAJAK_INIT
-} from '../data/financeDefaults';
 import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
 import { calculateDueDateFromInvoice } from '../utils/paymentTerms';
 
@@ -151,6 +144,7 @@ interface AppContextProps {
   deleteAset: (id: string) => void;
 
   // Pajak actions
+  deletedTaxIds: string[];
   addPajak: (pajak: Omit<PajakItem, 'id'>) => void;
   updatePajak: (id: string, pajak: Partial<PajakItem>) => void;
   deletePajak: (id: string) => void;
@@ -177,10 +171,26 @@ export const DEFAULT_PASSWORDS: Record<UserRole, string> = {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Master tombstone registry for all deleted IDs (prevents stale onSnapshot or offline cache re-hydration)
+  const initialDeletedDocs: string[] = (() => {
+    try {
+      const cached = localStorage.getItem('mk_deleted_doc_ids');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const [deletedDocIds, setDeletedDocIds] = useState<string[]>(initialDeletedDocs);
+  const deletedDocIdsRef = useRef<Set<string>>(new Set(initialDeletedDocs));
+
   const [materials, setMaterials] = useState<Material[]>(() => {
     const cached = localStorage.getItem('mk_materials');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return []; }
+      try {
+        const parsed = JSON.parse(cached) as Material[];
+        return parsed.filter(m => !deletedDocIdsRef.current.has(m.id));
+      } catch { return []; }
     }
     return [];
   });
@@ -188,7 +198,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [finishGoods, setFinishGoods] = useState<FinishGood[]>(() => {
     const cached = localStorage.getItem('mk_finish_goods');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return []; }
+      try {
+        const parsed = JSON.parse(cached) as FinishGood[];
+        return parsed.filter(f => !deletedDocIdsRef.current.has(f.id));
+      } catch { return []; }
     }
     return [];
   });
@@ -197,7 +210,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cached = localStorage.getItem('mk_purchase_orders');
     if (cached) {
       try {
-        const rawList = JSON.parse(cached) as PurchaseOrder[];
+        const rawList = (JSON.parse(cached) as PurchaseOrder[]).filter(p => !deletedDocIdsRef.current.has(p.id));
         return rawList.map(po => {
           const terms = po.syaratPembayaran || 'Tempo 30 Hari';
           const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
@@ -225,7 +238,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [suratJalanList, setSuratJalanList] = useState<SuratJalan[]>(() => {
     const cached = localStorage.getItem('mk_surat_jalan');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return []; }
+      try {
+        const parsed = JSON.parse(cached) as SuratJalan[];
+        return parsed.filter(s => !deletedDocIdsRef.current.has(s.id));
+      } catch { return []; }
     }
     return [];
   });
@@ -233,7 +249,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [keuanganList, setKeuanganList] = useState<Keuangan[]>(() => {
     const cached = localStorage.getItem('mk_keuangan');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return []; }
+      try {
+        const parsed = JSON.parse(cached) as Keuangan[];
+        return parsed.filter(k => !deletedDocIdsRef.current.has(k.id));
+      } catch { return []; }
     }
     return [];
   });
@@ -241,7 +260,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [customers, setCustomers] = useState<Customer[]>(() => {
     const cached = localStorage.getItem('mk_customers');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return []; }
+      try {
+        const parsed = JSON.parse(cached) as Customer[];
+        return parsed.filter(c => !deletedDocIdsRef.current.has(c.id));
+      } catch { return []; }
     }
     return [];
   });
@@ -249,7 +271,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [marketingList, setMarketingList] = useState<MarketingCommission[]>(() => {
     const cached = localStorage.getItem('mk_marketing');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return []; }
+      try {
+        const parsed = JSON.parse(cached) as MarketingCommission[];
+        return parsed.filter(m => !deletedDocIdsRef.current.has(m.id));
+      } catch { return []; }
     }
     return [];
   });
@@ -257,41 +282,64 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [hutangList, setHutangList] = useState<HutangUsaha[]>(() => {
     const cached = localStorage.getItem('mk_hutang_ap');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return DEFAULT_HUTANG_INIT; }
+      try {
+        const parsed = JSON.parse(cached) as HutangUsaha[];
+        return parsed.filter(h => !deletedDocIdsRef.current.has(h.id));
+      } catch { return []; }
     }
-    return DEFAULT_HUTANG_INIT;
+    return [];
   });
 
   const [kasKecilList, setKasKecilList] = useState<KasKecilItem[]>(() => {
     const cached = localStorage.getItem('mk_kas_kecil');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return DEFAULT_KAS_KECIL_INIT; }
+      try {
+        const parsed = JSON.parse(cached) as KasKecilItem[];
+        return parsed.filter(k => !deletedDocIdsRef.current.has(k.id));
+      } catch { return []; }
     }
-    return DEFAULT_KAS_KECIL_INIT;
+    return [];
   });
 
   const [bukuBankList, setBukuBankList] = useState<BukuBankItem[]>(() => {
     const cached = localStorage.getItem('mk_buku_bank');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return DEFAULT_BUKU_BANK_INIT; }
+      try {
+        const parsed = JSON.parse(cached) as BukuBankItem[];
+        return parsed.filter(b => !deletedDocIdsRef.current.has(b.id));
+      } catch { return []; }
     }
-    return DEFAULT_BUKU_BANK_INIT;
+    return [];
   });
 
   const [asetList, setAsetList] = useState<AsetTetap[]>(() => {
     const cached = localStorage.getItem('mk_aset_tetap');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return DEFAULT_ASET_INIT; }
+      try {
+        const parsed = JSON.parse(cached) as AsetTetap[];
+        return parsed.filter(a => !deletedDocIdsRef.current.has(a.id));
+      } catch { return []; }
     }
-    return DEFAULT_ASET_INIT;
+    return [];
   });
 
   const [pajakList, setPajakList] = useState<PajakItem[]>(() => {
     const cached = localStorage.getItem('mk_laporan_pajak');
     if (cached) {
-      try { return JSON.parse(cached); } catch { return DEFAULT_PAJAK_INIT; }
+      try {
+        const parsed = JSON.parse(cached) as PajakItem[];
+        return parsed.filter(p => !deletedDocIdsRef.current.has(p.id));
+      } catch { return []; }
     }
-    return DEFAULT_PAJAK_INIT;
+    return [];
+  });
+
+  const [deletedTaxIds, setDeletedTaxIds] = useState<string[]>(() => {
+    const cached = localStorage.getItem('mk_deleted_tax_ids');
+    if (cached) {
+      try { return JSON.parse(cached); } catch { return []; }
+    }
+    return [];
   });
 
   const [saldoAwalKasKecil, setSaldoAwalKasKecil] = useState<number>(() => {
@@ -354,27 +402,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isInitialSyncDone = useRef(false);
 
-  // Helper to safely write to Firestore
+  // Helper to safely sanitize and write to Firestore
+  const sanitizeForFirestore = <T,>(data: T): T => {
+    if (data === undefined) return null as any;
+    if (data === null || typeof data !== 'object') return data;
+    if (Array.isArray(data)) {
+      return data.map(item => sanitizeForFirestore(item)) as any;
+    }
+    const result: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        result[key] = sanitizeForFirestore(value);
+      }
+    }
+    return result;
+  };
+
   const syncToFirestore = async (colName: string, id: string, data: any) => {
+    const docId = String(id || '').trim();
+    if (!docId) return;
+
+    // If document is being created/updated, ensure it is un-marked from deleted tombstones
+    if (deletedDocIdsRef.current.has(docId)) {
+      deletedDocIdsRef.current.delete(docId);
+      const nextArr = Array.from(deletedDocIdsRef.current);
+      setDeletedDocIds(nextArr);
+      localStorage.setItem('mk_deleted_doc_ids', JSON.stringify(nextArr));
+    }
+
     try {
       setSyncStatus('syncing');
-      await setDoc(doc(db, colName, id), data, { merge: true });
+      const cleanData = sanitizeForFirestore(data);
+      await setDoc(doc(db, colName, docId), cleanData, { merge: true });
       setSyncStatus('synced');
       setIsFirebaseConnected(true);
     } catch (err) {
-      console.warn(`Firestore write error [${colName}/${id}]:`, err);
+      console.warn(`Firestore write error [${colName}/${docId}]:`, err);
       setSyncStatus('offline');
     }
   };
 
   const deleteFromFirestore = async (colName: string, id: string) => {
+    const docId = String(id || '').trim();
+    if (!docId) return;
+
+    // 1. Immediately register in tombstone ref & state so all onSnapshot callbacks discard it instantly
+    deletedDocIdsRef.current.add(docId);
+    const nextArr = Array.from(deletedDocIdsRef.current);
+    setDeletedDocIds(nextArr);
+    localStorage.setItem('mk_deleted_doc_ids', JSON.stringify(nextArr));
+
+    // Also persist tombstone list to Firestore config in the background
+    try {
+      setDoc(doc(db, 'app_config', 'deleted_doc_ids'), { ids: nextArr }, { merge: true }).catch(() => {});
+    } catch {
+      // ignore
+    }
+
+    // 2. Perform actual delete in Firestore
     try {
       setSyncStatus('syncing');
-      await deleteDoc(doc(db, colName, id));
+      await deleteDoc(doc(db, colName, docId));
       setSyncStatus('synced');
       setIsFirebaseConnected(true);
     } catch (err) {
-      console.warn(`Firestore delete error [${colName}/${id}]:`, err);
+      console.warn(`Firestore delete error [${colName}/${docId}]:`, err);
       setSyncStatus('offline');
     }
   };
@@ -420,196 +512,206 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 2. Setup Real-time Firestore Subscriptions for all collections
     try {
       const unsubMaterials = onSnapshot(collection(db, 'materials'), (snap) => {
-        const list = snap.docs.map(d => d.data() as Material);
-        if (list.length > 0) {
-          setMaterials(list);
-          localStorage.setItem('mk_materials', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_materials');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as Material[];
-              if (localList.length > 0) {
-                setMaterials(localList);
-                localList.forEach(item => { syncToFirestore('materials', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as Material));
+        setMaterials(list);
+        localStorage.setItem('mk_materials', JSON.stringify(list));
         setIsFirebaseConnected(true);
         setSyncStatus('synced');
       }, (err) => {
         console.warn('Firestore materials sync fallback:', err);
-        setIsFirebaseConnected(false);
-        setSyncStatus('offline');
       });
 
       const unsubFinishGoods = onSnapshot(collection(db, 'finish_goods'), (snap) => {
-        const list = snap.docs.map(d => d.data() as FinishGood);
-        if (list.length > 0) {
-          setFinishGoods(list);
-          localStorage.setItem('mk_finish_goods', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_finish_goods');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as FinishGood[];
-              if (localList.length > 0) {
-                setFinishGoods(localList);
-                localList.forEach(item => { syncToFirestore('finish_goods', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as FinishGood));
+        setFinishGoods(list);
+        localStorage.setItem('mk_finish_goods', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore finish_goods sync fallback:', err);
       });
 
       const unsubPOs = onSnapshot(collection(db, 'purchase_orders'), (snap) => {
-        const rawList = snap.docs.map(d => d.data() as PurchaseOrder);
-        if (rawList.length > 0) {
-          const list = rawList.map(po => {
-            const terms = po.syaratPembayaran || 'Tempo 30 Hari';
-            const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
-            const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
-              ? po.tanggalJatuhTempo
-              : calculateDueDateFromInvoice(invDate, terms);
-            return {
-              ...po,
-              nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
-                ? po.nomorInvoice
-                : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
-              syaratPembayaran: terms,
-              tanggalInvoice: invDate,
-              tanggalJatuhTempo: dueDate,
-              statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
-                ? 'Belum Bayar'
-                : po.statusInvoice
-            };
-          });
-          setPurchaseOrders(list);
-          localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_purchase_orders');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as PurchaseOrder[];
-              if (localList.length > 0) {
-                setPurchaseOrders(localList);
-                localList.forEach(item => { syncToFirestore('purchase_orders', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const rawList = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as PurchaseOrder));
+        const list = rawList.map(po => {
+          const terms = po.syaratPembayaran || 'Tempo 30 Hari';
+          const invDate = po.tanggalInvoice || po.tanggal || new Date().toISOString().split('T')[0];
+          const dueDate = po.tanggalJatuhTempo && po.tanggalJatuhTempo.trim() !== ''
+            ? po.tanggalJatuhTempo
+            : calculateDueDateFromInvoice(invDate, terms);
+          return {
+            ...po,
+            nomorInvoice: po.nomorInvoice && po.nomorInvoice.trim() !== ''
+              ? po.nomorInvoice
+              : `INV/MKN/2026/08/${po.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(100 + Math.random() * 900)}`,
+            syaratPembayaran: terms,
+            tanggalInvoice: invDate,
+            tanggalJatuhTempo: dueDate,
+            statusInvoice: (po.statusInvoice as string) === 'Belum Terbit' || !po.statusInvoice
+              ? 'Belum Bayar'
+              : po.statusInvoice
+          };
+        });
+        setPurchaseOrders(list);
+        localStorage.setItem('mk_purchase_orders', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore purchase_orders sync fallback:', err);
       });
 
       const unsubSJ = onSnapshot(collection(db, 'surat_jalan'), (snap) => {
-        const list = snap.docs.map(d => d.data() as SuratJalan);
-        if (list.length > 0) {
-          setSuratJalanList(list);
-          localStorage.setItem('mk_surat_jalan', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_surat_jalan');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as SuratJalan[];
-              if (localList.length > 0) {
-                setSuratJalanList(localList);
-                localList.forEach(item => { syncToFirestore('surat_jalan', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as SuratJalan));
+        setSuratJalanList(list);
+        localStorage.setItem('mk_surat_jalan', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore surat_jalan sync fallback:', err);
       });
 
       const unsubKeuangan = onSnapshot(collection(db, 'keuangan'), (snap) => {
-        const list = snap.docs.map(d => d.data() as Keuangan);
-        if (list.length > 0) {
-          setKeuanganList(list);
-          localStorage.setItem('mk_keuangan', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_keuangan');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as Keuangan[];
-              if (localList.length > 0) {
-                setKeuanganList(localList);
-                localList.forEach(item => { syncToFirestore('keuangan', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as Keuangan));
+        setKeuanganList(list);
+        localStorage.setItem('mk_keuangan', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore keuangan sync fallback:', err);
       });
 
       const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
-        const list = snap.docs.map(d => d.data() as Customer);
-        if (list.length > 0) {
-          setCustomers(list);
-          localStorage.setItem('mk_customers', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_customers');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as Customer[];
-              if (localList.length > 0) {
-                setCustomers(localList);
-                localList.forEach(item => { syncToFirestore('customers', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as Customer));
+        setCustomers(list);
+        localStorage.setItem('mk_customers', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore customers sync fallback:', err);
       });
 
       const unsubMarketing = onSnapshot(collection(db, 'marketing'), (snap) => {
-        const list = snap.docs.map(d => d.data() as MarketingCommission);
-        if (list.length > 0) {
-          setMarketingList(list);
-          localStorage.setItem('mk_marketing', JSON.stringify(list));
-        } else {
-          const cached = localStorage.getItem('mk_marketing');
-          if (cached) {
-            try {
-              const localList = JSON.parse(cached) as MarketingCommission[];
-              if (localList.length > 0) {
-                setMarketingList(localList);
-                localList.forEach(item => { syncToFirestore('marketing', item.id, item); });
-              }
-            } catch {}
-          }
-        }
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as MarketingCommission));
+        setMarketingList(list);
+        localStorage.setItem('mk_marketing', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore marketing sync fallback:', err);
       });
 
       const unsubHutang = onSnapshot(collection(db, 'hutang_ap'), (snap) => {
-        const list = snap.docs.map(d => d.data() as HutangUsaha);
-        const data = list.length > 0 ? list : (localStorage.getItem('mk_hutang_ap') ? JSON.parse(localStorage.getItem('mk_hutang_ap')!) : DEFAULT_HUTANG_INIT);
-        setHutangList(data);
-        localStorage.setItem('mk_hutang_ap', JSON.stringify(data));
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as HutangUsaha));
+        setHutangList(list);
+        localStorage.setItem('mk_hutang_ap', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore hutang_ap sync fallback:', err);
       });
 
       const unsubKasKecil = onSnapshot(collection(db, 'kas_kecil'), (snap) => {
-        const list = snap.docs.map(d => d.data() as KasKecilItem);
-        const data = list.length > 0 ? list : (localStorage.getItem('mk_kas_kecil') ? JSON.parse(localStorage.getItem('mk_kas_kecil')!) : DEFAULT_KAS_KECIL_INIT);
-        setKasKecilList(data);
-        localStorage.setItem('mk_kas_kecil', JSON.stringify(data));
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as KasKecilItem));
+        setKasKecilList(list);
+        localStorage.setItem('mk_kas_kecil', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore kas_kecil sync fallback:', err);
       });
 
       const unsubBukuBank = onSnapshot(collection(db, 'buku_bank'), (snap) => {
-        const list = snap.docs.map(d => d.data() as BukuBankItem);
-        const data = list.length > 0 ? list : (localStorage.getItem('mk_buku_bank') ? JSON.parse(localStorage.getItem('mk_buku_bank')!) : DEFAULT_BUKU_BANK_INIT);
-        setBukuBankList(data);
-        localStorage.setItem('mk_buku_bank', JSON.stringify(data));
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as BukuBankItem));
+        setBukuBankList(list);
+        localStorage.setItem('mk_buku_bank', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore buku_bank sync fallback:', err);
       });
 
       const unsubAset = onSnapshot(collection(db, 'aset_tetap'), (snap) => {
-        const list = snap.docs.map(d => d.data() as AsetTetap);
-        const data = list.length > 0 ? list : (localStorage.getItem('mk_aset_tetap') ? JSON.parse(localStorage.getItem('mk_aset_tetap')!) : DEFAULT_ASET_INIT);
-        setAsetList(data);
-        localStorage.setItem('mk_aset_tetap', JSON.stringify(data));
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as AsetTetap));
+        setAsetList(list);
+        localStorage.setItem('mk_aset_tetap', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore aset_tetap sync fallback:', err);
       });
 
       const unsubPajak = onSnapshot(collection(db, 'pajak'), (snap) => {
-        const list = snap.docs.map(d => d.data() as PajakItem);
-        const data = list.length > 0 ? list : (localStorage.getItem('mk_laporan_pajak') ? JSON.parse(localStorage.getItem('mk_laporan_pajak')!) : DEFAULT_PAJAK_INIT);
-        setPajakList(data);
-        localStorage.setItem('mk_laporan_pajak', JSON.stringify(data));
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as PajakItem));
+        setPajakList(list);
+        localStorage.setItem('mk_laporan_pajak', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore pajak sync fallback:', err);
+      });
+
+      const unsubDeletedDocIds = onSnapshot(doc(db, 'app_config', 'deleted_doc_ids'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.ids)) {
+            data.ids.forEach(id => deletedDocIdsRef.current.add(id));
+            const nextArr = Array.from(deletedDocIdsRef.current);
+            setDeletedDocIds(nextArr);
+            localStorage.setItem('mk_deleted_doc_ids', JSON.stringify(nextArr));
+
+            // Instantly cleanse all in-memory lists
+            setMaterials(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setFinishGoods(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setPurchaseOrders(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setSuratJalanList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setKeuanganList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setCustomers(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setMarketingList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setHutangList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setKasKecilList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setBukuBankList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setAsetList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setPajakList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore deleted_doc_ids sync fallback:', err);
+      });
+
+      const unsubDeletedTaxIds = onSnapshot(doc(db, 'app_config', 'deleted_tax_ids'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.ids)) {
+            setDeletedTaxIds(data.ids);
+            localStorage.setItem('mk_deleted_tax_ids', JSON.stringify(data.ids));
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore deleted_tax_ids sync fallback:', err);
       });
 
       const unsubPasswords = onSnapshot(doc(db, 'app_config', 'passwords'), (docSnap) => {
@@ -704,6 +806,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubBukuBank();
         unsubAset();
         unsubPajak();
+        unsubDeletedDocIds();
+        unsubDeletedTaxIds();
         unsubPasswords();
         unsubFinanceSettings();
       };
@@ -712,59 +816,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsFirebaseConnected(false);
     }
   }, []);
-
-  // Cleanup old dummy data automatically
-  useEffect(() => {
-    const dummyIds = ['1', '2', '3', '4', '5'];
-    
-    // Cleanup Buku Bank
-    if (bukuBankList.some(b => dummyIds.includes(b.id))) {
-      const cleanList = bukuBankList.filter(b => !dummyIds.includes(b.id));
-      setBukuBankList(cleanList);
-      localStorage.setItem('mk_buku_bank', JSON.stringify(cleanList));
-      dummyIds.forEach(id => deleteFromFirestore('buku_bank', id));
-    }
-    
-    // Cleanup Kas Kecil
-    if (kasKecilList.some(k => dummyIds.includes(k.id))) {
-      const cleanList = kasKecilList.filter(k => !dummyIds.includes(k.id));
-      setKasKecilList(cleanList);
-      localStorage.setItem('mk_kas_kecil', JSON.stringify(cleanList));
-      dummyIds.forEach(id => deleteFromFirestore('kas_kecil', id));
-    }
-    
-    // Cleanup Aset Tetap
-    if (asetList.some(a => dummyIds.includes(a.id))) {
-      const cleanList = asetList.filter(a => !dummyIds.includes(a.id));
-      setAsetList(cleanList);
-      localStorage.setItem('mk_aset_tetap', JSON.stringify(cleanList));
-      dummyIds.forEach(id => deleteFromFirestore('aset_tetap', id));
-    }
-    
-    // Cleanup Keuangan
-    if (keuanganList.some(k => dummyIds.includes(k.id))) {
-      const cleanList = keuanganList.filter(k => !dummyIds.includes(k.id));
-      setKeuanganList(cleanList);
-      localStorage.setItem('mk_keuangan', JSON.stringify(cleanList));
-      dummyIds.forEach(id => deleteFromFirestore('keuangan', id));
-    }
-
-    // Cleanup Hutang
-    if (hutangList.some(h => dummyIds.includes(h.id))) {
-      const cleanList = hutangList.filter(h => !dummyIds.includes(h.id));
-      setHutangList(cleanList);
-      localStorage.setItem('mk_hutang_usaha', JSON.stringify(cleanList));
-      dummyIds.forEach(id => deleteFromFirestore('hutang', id));
-    }
-
-    // Cleanup Pajak
-    if (pajakList.some(p => dummyIds.includes(p.id))) {
-      const cleanList = pajakList.filter(p => !dummyIds.includes(p.id));
-      setPajakList(cleanList);
-      localStorage.setItem('mk_laporan_pajak', JSON.stringify(cleanList));
-      dummyIds.forEach(id => deleteFromFirestore('pajak', id));
-    }
-  }, [bukuBankList, kasKecilList, asetList, keuanganList, hutangList, pajakList]);
 
   // Sync state helpers
   const saveMaterials = (newMaterials: Material[]) => {
@@ -1152,9 +1203,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deletePurchaseOrder = (id: string) => {
+    const target = purchaseOrders.find(item => item.id === id);
     const updated = purchaseOrders.filter(item => item.id !== id);
     savePurchaseOrders(updated);
     deleteFromFirestore('purchase_orders', id);
+
+    if (target) {
+      // 1. Remove related Keuangan records (Income / Invoice payments)
+      const updatedKeuangan = keuanganList.filter(
+        k => k.referensiId !== target.nomorPO && !k.keterangan?.includes(target.nomorPO)
+      );
+      if (updatedKeuangan.length !== keuanganList.length) {
+        saveKeuangan(updatedKeuangan);
+        keuanganList
+          .filter(k => k.referensiId === target.nomorPO || k.keterangan?.includes(target.nomorPO))
+          .forEach(k => deleteFromFirestore('keuangan', k.id));
+      }
+
+      // 2. Remove related Buku Bank records
+      const updatedBukuBank = bukuBankList.filter(
+        b => b.referensi !== target.nomorPO && b.nomorReferensi !== target.nomorPO && !b.keterangan?.includes(target.nomorPO)
+      );
+      if (updatedBukuBank.length !== bukuBankList.length) {
+        saveBukuBank(updatedBukuBank);
+        bukuBankList
+          .filter(b => b.referensi === target.nomorPO || b.nomorReferensi === target.nomorPO || b.keterangan?.includes(target.nomorPO))
+          .forEach(b => deleteFromFirestore('buku_bank', b.id));
+      }
+
+      // 3. Remove related Surat Jalan records
+      const updatedSJ = suratJalanList.filter(
+        sj => sj.purchaseOrderId !== target.id && sj.nomorPO !== target.nomorPO && (sj as any).poNomor !== target.nomorPO
+      );
+      if (updatedSJ.length !== suratJalanList.length) {
+        saveSuratJalan(updatedSJ);
+        suratJalanList
+          .filter(sj => sj.purchaseOrderId === target.id || sj.nomorPO === target.nomorPO || (sj as any).poNomor === target.nomorPO)
+          .forEach(sj => deleteFromFirestore('surat_jalan', sj.id));
+      }
+
+      // 4. Mark virtual/auto tax ids as deleted
+      const taxPpnId = `auto-ppn-${target.id}`;
+      const taxPphId = `auto-pph-${target.id}`;
+      const nextDeletedTax = Array.from(new Set([...deletedTaxIds, taxPpnId, taxPphId]));
+      setDeletedTaxIds(nextDeletedTax);
+      localStorage.setItem('mk_deleted_tax_ids', JSON.stringify(nextDeletedTax));
+      syncToFirestore('app_config', 'deleted_tax_ids', { ids: nextDeletedTax });
+    }
   };
 
   const updatePOStatus = (id: string, status: PurchaseOrder['statusPO']) => {
@@ -1438,9 +1533,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteHutang = (id: string) => {
+    const target = hutangList.find(h => h.id === id);
     const updated = hutangList.filter(item => item.id !== id);
     saveHutang(updated);
     deleteFromFirestore('hutang_ap', id);
+
+    if (target) {
+      // Remove any related Keuangan payments created for this AP
+      const updatedKeuangan = keuanganList.filter(
+        k => k.referensiId !== target.nomorTagihan && !k.keterangan?.includes(target.nomorTagihan)
+      );
+      if (updatedKeuangan.length !== keuanganList.length) {
+        saveKeuangan(updatedKeuangan);
+        keuanganList
+          .filter(k => k.referensiId === target.nomorTagihan || k.keterangan?.includes(target.nomorTagihan))
+          .forEach(k => deleteFromFirestore('keuangan', k.id));
+      }
+    }
   };
 
   const bayarHutang = (id: string, nominalBayar: number, metode: string, catatan?: string) => {
@@ -1646,9 +1755,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deletePajak = (id: string) => {
-    const updated = pajakList.filter(item => item.id !== id);
+    const cleanId = String(id || '').trim();
+    if (!cleanId) return;
+
+    const updated = pajakList.filter(item => item.id !== cleanId);
     savePajak(updated);
-    deleteFromFirestore('pajak', id);
+    deleteFromFirestore('pajak', cleanId);
+
+    // Track deleted tax ID so virtual/auto tax generator never resurrects it
+    const nextDeleted = Array.from(new Set([...deletedTaxIds, cleanId]));
+    setDeletedTaxIds(nextDeleted);
+    localStorage.setItem('mk_deleted_tax_ids', JSON.stringify(nextDeleted));
+    syncToFirestore('app_config', 'deleted_tax_ids', { ids: nextDeleted });
+
+    if (cleanId.startsWith('auto-ppn-')) {
+      const poId = cleanId.replace('auto-ppn-', '');
+      const targetPo = purchaseOrders.find(p => p.id === poId);
+      if (targetPo) {
+        updatePurchaseOrder(poId, {
+          tipePajak: targetPo.tipePajak === 'PPN & PPh' ? 'PPh' : 'Non PPN',
+          ppnNominal: 0
+        });
+      }
+    } else if (cleanId.startsWith('auto-pph-')) {
+      const poId = cleanId.replace('auto-pph-', '');
+      const targetPo = purchaseOrders.find(p => p.id === poId);
+      if (targetPo) {
+        updatePurchaseOrder(poId, {
+          tipePajak: targetPo.tipePajak === 'PPN & PPh' ? 'PPN' : 'Non PPN',
+          pphNominal: 0
+        });
+      }
+    }
   };
 
   const updateSaldoAwalKasKecil = (val: number) => {
@@ -1790,6 +1928,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDatabase = () => {
+    // Delete in Firestore
+    materials.forEach(m => deleteFromFirestore('materials', m.id));
+    finishGoods.forEach(f => deleteFromFirestore('finish_goods', f.id));
+    purchaseOrders.forEach(p => deleteFromFirestore('purchase_orders', p.id));
+    suratJalanList.forEach(s => deleteFromFirestore('surat_jalan', s.id));
+    keuanganList.forEach(k => deleteFromFirestore('keuangan', k.id));
+    customers.forEach(c => deleteFromFirestore('customers', c.id));
+    marketingList.forEach(m => deleteFromFirestore('marketing', m.id));
+    hutangList.forEach(h => deleteFromFirestore('hutang_ap', h.id));
+    kasKecilList.forEach(k => deleteFromFirestore('kas_kecil', k.id));
+    bukuBankList.forEach(b => deleteFromFirestore('buku_bank', b.id));
+    asetList.forEach(a => deleteFromFirestore('aset_tetap', a.id));
+    pajakList.forEach(p => deleteFromFirestore('pajak', p.id));
+
     localStorage.setItem('mk_materials', JSON.stringify([]));
     localStorage.setItem('mk_finish_goods', JSON.stringify([]));
     localStorage.setItem('mk_purchase_orders', JSON.stringify([]));
@@ -1904,6 +2056,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addPajak,
       updatePajak,
       deletePajak,
+      deletedTaxIds,
       resetDatabase
     }}>
       {children}

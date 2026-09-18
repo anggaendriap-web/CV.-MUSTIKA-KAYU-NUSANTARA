@@ -3,10 +3,12 @@ import { Trash2, AlertTriangle, X } from 'lucide-react';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  onCancel?: () => void;
   onConfirm: () => void;
   title?: string;
   message?: string;
+  description?: string;
   itemName?: string;
   isLoading?: boolean;
 }
@@ -14,13 +16,30 @@ interface DeleteConfirmModalProps {
 export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   isOpen,
   onClose,
+  onCancel,
   onConfirm,
   title = 'Konfirmasi Hapus Data',
-  message = 'Apakah Anda yakin ingin menghapus data ini? Tindakan ini akan menghapus data secara permanen dari sistem.',
+  message,
+  description,
   itemName,
   isLoading = false
 }) => {
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (onClose) onClose();
+    if (onCancel) onCancel();
+  };
+
+  const handleConfirm = () => {
+    try {
+      onConfirm();
+    } finally {
+      handleClose();
+    }
+  };
+
+  const finalMessage = message || description || 'Apakah Anda yakin ingin menghapus data ini? Tindakan ini akan menghapus data secara permanen dari sistem.';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
@@ -39,7 +58,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </h3>
           
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            {message}
+            {finalMessage}
           </p>
 
           {itemName && (
@@ -53,7 +72,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/80 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isLoading}
             className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
           >
@@ -61,10 +80,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
+            onClick={handleConfirm}
             disabled={isLoading}
             className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-red-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
@@ -76,7 +92,7 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         {/* Close icon top right */}
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer"
         >
           <X className="w-4 h-4" />

@@ -724,6 +724,21 @@ export const BukuBankView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Single Item Modal */}
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        title="Hapus Catatan Mutasi Bank"
+        message={`Apakah Anda yakin ingin menghapus catatan mutasi bank "${itemToDelete?.kodeMutasi} - ${itemToDelete?.keterangan}"?`}
+        itemName={itemToDelete ? `${itemToDelete.kodeMutasi} - ${itemToDelete.keterangan} (Rp ${itemToDelete.nominal.toLocaleString('id-ID')})` : ''}
+        onConfirm={() => {
+          if (itemToDelete) {
+            deleteBukuBank(itemToDelete.id);
+            setItemToDelete(null);
+          }
+        }}
+        onClose={() => setItemToDelete(null)}
+      />
     </div>
   );
 };

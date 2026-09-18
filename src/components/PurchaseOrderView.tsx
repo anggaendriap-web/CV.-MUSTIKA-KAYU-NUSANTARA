@@ -311,7 +311,7 @@ export const PurchaseOrderView: React.FC = () => {
     const { subtotal, ppn, pph, total } = calculateFormTotals();
 
     const itemsToSave = formItems.map(it => ({
-      finishGoodId: it.finishGoodId || undefined,
+      finishGoodId: it.finishGoodId || '',
       namaPallet: it.namaItem,
       tipeIspm: it.tipeIspm,
       jumlah: it.jumlah,
