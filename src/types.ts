@@ -8,19 +8,94 @@ export interface User {
   avatarUrl?: string;
 }
 
+export type MaterialKategori = 
+  | 'Kayu Log' 
+  | 'Balok Kayu' 
+  | 'Papan Kayu' 
+  | 'Paku Koil / Besi' 
+  | 'Obat Pengawet / Kimia' 
+  | 'Cat / Pelapis' 
+  | 'Papan' 
+  | 'Balok' 
+  | 'Paku' 
+  | 'Cat/Pelapis'
+  | 'Lainnya';
+
+export interface MaterialMutasiItem {
+  id: string;
+  tanggal: string; // ISO Date or YYYY-MM-DD
+  nomorBukti?: string; // e.g. TTM-2026/09/001 or IN-MAT-001
+  tipe: 'MASUK_WAREHOUSE' | 'KELUAR_PRODUKSI' | 'PENYESUAIAN_OPNAME';
+  jumlah: number;
+  sisaStokSetelahnya?: number;
+  pengambil?: string; // Nama staf/mandor produksi yang mengambil
+  penyerah?: string; // Petugas gudang yang menyerahkan
+  keperluan?: string; // e.g. "Produksi SPK Pallet ISPM 100x120"
+  nomorSPK?: string; // No SPK / Target Order
+  keterangan?: string;
+  dicatatOleh?: string;
+}
+
+export interface TandaTerimaMaterialItem {
+  materialId: string;
+  kodeMaterial: string;
+  namaMaterial: string;
+  ukuran: string;
+  dimensi: string;
+  jumlah: number;
+  satuan: string;
+  keterangan?: string;
+}
+
+export interface TandaTerimaPengambilanMaterial {
+  id: string;
+  nomorBon: string; // e.g. BON-MAT/2026/09/001
+  tanggal: string; // YYYY-MM-DD
+  nomorSPK?: string; // e.g. SPK-2026-088
+  targetProduk?: string; // e.g. Pallet Kayu Standard 100x120 cm
+  divisiPemohon: string; // Divisi Assembling / Sawmill / Kiln Dry
+  namaPengambil: string; // Mandor / Staf Produksi
+  namaPenyerah: string; // Petugas Gudang / Warehouse
+  items: TandaTerimaMaterialItem[];
+  catatan?: string;
+  status: 'Diserahkan' | 'Draf' | 'Selesai';
+  createdAt: string;
+}
+
 export interface Material {
   id: string;
   kode: string; // e.g., MAT-001
-  nama: string; // e.g., Kayu Albasia 2x10x130
-  kategori: 'Kayu Log' | 'Papan' | 'Balok' | 'Paku' | 'Cat/Pelapis' | 'Lainnya';
-  stok: number;
-  stokMasuk?: number; // Total incoming stock
-  stokKeluar?: number; // Total outgoing stock (production/loss)
-  satuan: 'm3' | 'pcs' | 'kg' | 'liter';
+  nama: string; // e.g., Kayu Papan Mahoni 2x10x120
+  ukuran?: string; // e.g., "2 x 10 x 120 cm" or "Dia 25 cm x P 200 cm"
+  dimensi?: string; // e.g., "20mm x 100mm x 1200mm"
+  kategori: MaterialKategori;
+  tanggalMasukWarehouse?: string; // YYYY-MM-DD
+  stokAwal?: number; // Kondisi Stock QTY Awal
+  stokMasuk?: number; // Total incoming stock (pembelian/penerimaan)
+  stokKeluar?: number; // Total outgoing stock (pemakaian produksi)
+  stok: number; // Sisa Stok Terkini
+  satuan: 'm3' | 'pcs' | 'kg' | 'liter' | 'batang' | 'lembar' | 'dus' | 'sak';
   hargaBeli: number; // IDR
   minimalStok: number;
   supplier: string;
+  lokasiGudang?: string; // e.g. "Gudang Bahan Baku A"
+  riwayatMutasi?: MaterialMutasiItem[]; // Pencatatan keluar masuk yang dipakai oleh produksi
   terakhirDiperbarui: string; // ISO Date
+}
+
+export interface FinishGoodMutasiItem {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  nomorBukti?: string; // e.g. PRD-2026-001 or SJ-2026-001
+  tipe: 'MASUK_PRODUKSI' | 'KELUAR_PENGIRIMAN' | 'PENYESUAIAN_OPNAME';
+  jumlah: number;
+  sisaStokSetelahnya?: number;
+  noReferensi?: string; // PO number / Surat Jalan / SPK
+  tujuanPengiriman?: string; // Customer / Pelanggan tujuan
+  sopir?: string;
+  noKendaraan?: string;
+  keterangan?: string;
+  dicatatOleh?: string;
 }
 
 export interface FinishGood {
@@ -29,11 +104,21 @@ export interface FinishGood {
   nama: string; // e.g., Pallet Standard 100x120
   tipe: 'Standard' | 'Custom' | 'Ekspor ISPM 15' | 'Heavy Duty' | 'Dua Arah';
   dimensi: string; // e.g., 1000 x 1200 x 130 mm
-  stok: number;
+  stokAwal?: number; // Stok Awal untuk memudahkan Stock Opname
+  stokMasukProduksi?: number; // Total Masuk dari Produksi ke Gudang
+  stokKeluarPengiriman?: number; // Total Keluar Barang / Pengiriman Surat Jalan
+  stok: number; // Stok Akhir Gudang
   satuan: 'pcs';
   hargaJual: number; // IDR
   minimalStok: number;
+  tanggalMasukProduksi?: string; // Tanggal Masuk dari Produksi ke Gudang (YYYY-MM-DD)
+  tanggalKeluarTerakhir?: string; // Tanggal Keluar Barang (YYYY-MM-DD)
+  stokFisikOpname?: number; // Stok Fisik hasil Opname
+  selisihOpname?: number; // Selisih Fisik vs Sistem
+  tanggalOpnameTerakhir?: string; // Tanggal terakhir stock opname
+  keteranganOpname?: string; // Catatan hasil opname
   deskripsi: string;
+  riwayatMutasiFG?: FinishGoodMutasiItem[];
   terakhirDiperbarui: string; // ISO Date
 }
 

@@ -205,6 +205,24 @@
         "noReferensi": { "type": "string" }
       },
       "required": ["tanggal", "tipe", "kategori", "nominal"]
+    },
+    "TandaTerimaMaterial": {
+      "title": "Tanda Terima Pengambilan Material",
+      "description": "Dokumen serah terima pengambilan bahan baku oleh divisi produksi",
+      "type": "object",
+      "properties": {
+        "nomorBon": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "namaPengambil": { "type": "string" },
+        "divisiPemohon": { "type": "string" },
+        "namaPenyerah": { "type": "string" },
+        "targetProduk": { "type": "string" },
+        "nomorSPK": { "type": "string" },
+        "items": { "type": "array" },
+        "catatan": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["nomorBon", "tanggal", "namaPengambil", "divisiPemohon", "items"]
     }
   }
 }

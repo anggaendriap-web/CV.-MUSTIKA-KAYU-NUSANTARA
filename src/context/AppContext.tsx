@@ -13,7 +13,10 @@ import {
   KasKecilItem,
   BukuBankItem,
   AsetTetap,
-  PajakItem
+  PajakItem,
+  TandaTerimaPengambilanMaterial,
+  MaterialMutasiItem,
+  FinishGoodMutasiItem
 } from '../types';
 import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
 import { calculateDueDateFromInvoice } from '../utils/paymentTerms';
@@ -31,6 +34,7 @@ interface AppContextProps {
   bukuBankList: BukuBankItem[];
   asetList: AsetTetap[];
   pajakList: PajakItem[];
+  tandaTerimaMaterialList: TandaTerimaPengambilanMaterial[];
   currentUser: User | null;
   darkMode: boolean;
   
@@ -85,12 +89,20 @@ interface AppContextProps {
   updateMaterial: (id: string, material: Partial<Material>) => void;
   deleteMaterial: (id: string) => void;
   adjustMaterialStock: (id: string, amount: number) => void;
+  recordMaterialMutation: (materialId: string, mutasi: Omit<MaterialMutasiItem, 'id'>) => void;
+
+  // Form Tanda Terima Pengambilan Material actions
+  addTandaTerimaMaterial: (bon: Omit<TandaTerimaPengambilanMaterial, 'id' | 'createdAt'>) => string;
+  updateTandaTerimaMaterial: (id: string, bon: Partial<TandaTerimaPengambilanMaterial>) => void;
+  deleteTandaTerimaMaterial: (id: string) => void;
 
   // FinishGood actions
   addFinishGood: (good: Omit<FinishGood, 'id' | 'terakhirDiperbarui'>) => void;
   updateFinishGood: (id: string, good: Partial<FinishGood>) => void;
   deleteFinishGood: (id: string) => void;
   adjustFinishGoodStock: (id: string, amount: number) => void;
+  recordFinishGoodMutation: (finishGoodId: string, mutasi: Omit<FinishGoodMutasiItem, 'id'>) => void;
+  updateFinishGoodOpname: (finishGoodId: string, stokFisik: number, keterangan?: string) => void;
   producePallets: (finishGoodId: string, quantity: number, consumedMaterials: { materialId: string; amount: number }[]) => { success: boolean; error?: string };
 
   // Purchase Order & Invoice actions
@@ -329,6 +341,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(cached) as PajakItem[];
         return parsed.filter(p => !deletedDocIdsRef.current.has(p.id));
+      } catch { return []; }
+    }
+    return [];
+  });
+
+  const [tandaTerimaMaterialList, setTandaTerimaMaterialList] = useState<TandaTerimaPengambilanMaterial[]>(() => {
+    const cached = localStorage.getItem('mk_tanda_terima_material');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as TandaTerimaPengambilanMaterial[];
+        return parsed.filter(t => !deletedDocIdsRef.current.has(t.id));
       } catch { return []; }
     }
     return [];
@@ -674,6 +697,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Firestore pajak sync fallback:', err);
       });
 
+      const unsubTTM = onSnapshot(collection(db, 'tanda_terima_material'), (snap) => {
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as TandaTerimaPengambilanMaterial));
+        setTandaTerimaMaterialList(list);
+        localStorage.setItem('mk_tanda_terima_material', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore tanda_terima_material sync fallback:', err);
+      });
+
       const unsubDeletedDocIds = onSnapshot(doc(db, 'app_config', 'deleted_doc_ids'), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -696,6 +731,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setBukuBankList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setAsetList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setPajakList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setTandaTerimaMaterialList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
           }
         }
       }, (err) => {
@@ -806,6 +842,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubBukuBank();
         unsubAset();
         unsubPajak();
+        unsubTTM();
         unsubDeletedDocIds();
         unsubDeletedTaxIds();
         unsubPasswords();
@@ -826,6 +863,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveFinishGoods = (newGoods: FinishGood[]) => {
     setFinishGoods(newGoods);
     localStorage.setItem('mk_finish_goods', JSON.stringify(newGoods));
+  };
+
+  const saveTandaTerimaMaterial = (newList: TandaTerimaPengambilanMaterial[]) => {
+    setTandaTerimaMaterialList(newList);
+    localStorage.setItem('mk_tanda_terima_material', JSON.stringify(newList));
   };
 
   const savePurchaseOrders = (newPOs: PurchaseOrder[]) => {
@@ -931,11 +973,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- CRUD Material ---
   const addMaterial = (material: Omit<Material, 'id' | 'terakhirDiperbarui'>) => {
     const id = `mat-${Date.now()}`;
+    const today = material.tanggalMasukWarehouse || new Date().toISOString().split('T')[0];
+    const initialQty = Number(material.stok || 0);
+    const stokAwal = material.stokAwal !== undefined ? Number(material.stokAwal) : initialQty;
+    const stokMasuk = material.stokMasuk !== undefined ? Number(material.stokMasuk) : initialQty;
+    const stokKeluar = material.stokKeluar !== undefined ? Number(material.stokKeluar) : 0;
+    const stok = initialQty;
+
+    const initialMutasi: MaterialMutasiItem[] = material.riwayatMutasi && material.riwayatMutasi.length > 0
+      ? material.riwayatMutasi
+      : stok > 0 ? [{
+          id: `mut-${Date.now()}`,
+          tanggal: today,
+          tipe: 'MASUK_WAREHOUSE',
+          jumlah: stok,
+          sisaStokSetelahnya: stok,
+          keterangan: 'Penerimaan Awal / Saldo Awal Gudang',
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        }] : [];
+
     const newMat: Material = {
       ...material,
       id,
-      stokMasuk: material.stok,
-      stokKeluar: 0,
+      ukuran: material.ukuran || '',
+      dimensi: material.dimensi || '',
+      tanggalMasukWarehouse: today,
+      stokAwal,
+      stokMasuk,
+      stokKeluar,
+      stok,
+      riwayatMutasi: initialMutasi,
       terakhirDiperbarui: new Date().toISOString()
     };
     const updated = [newMat, ...materials];
@@ -968,17 +1035,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const adjustMaterialStock = (id: string, amount: number) => {
     let updatedItem: Material | null = null;
+    const today = new Date().toISOString().split('T')[0];
     const updated = materials.map(item => {
       if (item.id === id) {
         const newStok = Math.max(0, item.stok + amount);
         const stokMasuk = amount > 0 ? (item.stokMasuk || 0) + amount : (item.stokMasuk || 0);
         const stokKeluar = amount < 0 ? (item.stokKeluar || 0) + Math.abs(amount) : (item.stokKeluar || 0);
         
+        const mutasiEntry: MaterialMutasiItem = {
+          id: `mut-${Date.now()}`,
+          tanggal: today,
+          tipe: amount >= 0 ? 'MASUK_WAREHOUSE' : 'KELUAR_PRODUKSI',
+          jumlah: Math.abs(amount),
+          sisaStokSetelahnya: newStok,
+          keterangan: amount >= 0 ? 'Penyesuaian Masuk Manual' : 'Penyesuaian Keluar Pemakaian Manual',
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        };
+
         updatedItem = {
           ...item,
           stok: newStok,
           stokMasuk,
           stokKeluar,
+          riwayatMutasi: [mutasiEntry, ...(item.riwayatMutasi || [])],
           terakhirDiperbarui: new Date().toISOString()
         };
         return updatedItem;
@@ -989,12 +1068,160 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedItem) syncToFirestore('materials', id, updatedItem);
   };
 
+  const recordMaterialMutation = (materialId: string, mutasi: Omit<MaterialMutasiItem, 'id'>) => {
+    let updatedItem: Material | null = null;
+    const updated = materials.map(item => {
+      if (item.id === materialId) {
+        const mutasiId = `mut-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const qty = Number(mutasi.jumlah);
+        let newStok = item.stok;
+        let stokMasuk = item.stokMasuk || 0;
+        let stokKeluar = item.stokKeluar || 0;
+
+        if (mutasi.tipe === 'MASUK_WAREHOUSE') {
+          newStok = item.stok + qty;
+          stokMasuk += qty;
+        } else if (mutasi.tipe === 'KELUAR_PRODUKSI') {
+          newStok = Math.max(0, item.stok - qty);
+          stokKeluar += qty;
+        } else if (mutasi.tipe === 'PENYESUAIAN_OPNAME') {
+          newStok = qty;
+        }
+
+        const newMutasiEntry: MaterialMutasiItem = {
+          ...mutasi,
+          id: mutasiId,
+          jumlah: qty,
+          sisaStokSetelahnya: newStok,
+          dicatatOleh: mutasi.dicatatOleh || currentUser?.name || 'Warehouse Admin'
+        };
+
+        updatedItem = {
+          ...item,
+          stok: newStok,
+          stokMasuk,
+          stokKeluar,
+          riwayatMutasi: [newMutasiEntry, ...(item.riwayatMutasi || [])],
+          terakhirDiperbarui: new Date().toISOString()
+        };
+        return updatedItem;
+      }
+      return item;
+    });
+    saveMaterials(updated);
+    if (updatedItem) syncToFirestore('materials', materialId, updatedItem);
+  };
+
+  // --- CRUD Tanda Terima Pengambilan Material ---
+  const addTandaTerimaMaterial = (bon: Omit<TandaTerimaPengambilanMaterial, 'id' | 'createdAt'>): string => {
+    const id = `ttm-${Date.now()}`;
+    const generatedBon = bon.nomorBon && bon.nomorBon.trim() !== ''
+      ? bon.nomorBon
+      : `BON-MAT/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(100 + Math.random() * 900)}`;
+
+    const newBon: TandaTerimaPengambilanMaterial = {
+      ...bon,
+      id,
+      nomorBon: generatedBon,
+      createdAt: new Date().toISOString()
+    };
+
+    // Deduct materials from stock and record mutations
+    const updatedMaterials = materials.map(mat => {
+      const itemBon = bon.items.find(i => i.materialId === mat.id);
+      if (itemBon && itemBon.jumlah > 0) {
+        const qty = Number(itemBon.jumlah);
+        const nextStok = Math.max(0, mat.stok - qty);
+        const nextKeluar = (mat.stokKeluar || 0) + qty;
+        const newMutasiEntry: MaterialMutasiItem = {
+          id: `mut-${Date.now()}-${mat.id}`,
+          tanggal: bon.tanggal,
+          nomorBukti: generatedBon,
+          tipe: 'KELUAR_PRODUKSI',
+          jumlah: qty,
+          sisaStokSetelahnya: nextStok,
+          pengambil: bon.namaPengambil,
+          penyerah: bon.namaPenyerah,
+          keperluan: bon.targetProduk || `Divisi ${bon.divisiPemohon}`,
+          nomorSPK: bon.nomorSPK,
+          keterangan: itemBon.keterangan || `Pengambilan Material Produksi (${bon.divisiPemohon})`,
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        };
+
+        const updatedMat: Material = {
+          ...mat,
+          stok: nextStok,
+          stokKeluar: nextKeluar,
+          riwayatMutasi: [newMutasiEntry, ...(mat.riwayatMutasi || [])],
+          terakhirDiperbarui: new Date().toISOString()
+        };
+        syncToFirestore('materials', mat.id, updatedMat);
+        return updatedMat;
+      }
+      return mat;
+    });
+
+    saveMaterials(updatedMaterials);
+    const updatedBonList = [newBon, ...tandaTerimaMaterialList];
+    saveTandaTerimaMaterial(updatedBonList);
+    syncToFirestore('tanda_terima_material', id, newBon);
+
+    return id;
+  };
+
+  const updateTandaTerimaMaterial = (id: string, bon: Partial<TandaTerimaPengambilanMaterial>) => {
+    let updatedItem: TandaTerimaPengambilanMaterial | null = null;
+    const updated = tandaTerimaMaterialList.map(item => {
+      if (item.id === id) {
+        updatedItem = { ...item, ...bon };
+        return updatedItem;
+      }
+      return item;
+    });
+    saveTandaTerimaMaterial(updated);
+    if (updatedItem) syncToFirestore('tanda_terima_material', id, updatedItem);
+  };
+
+  const deleteTandaTerimaMaterial = (id: string) => {
+    const updated = tandaTerimaMaterialList.filter(item => item.id !== id);
+    saveTandaTerimaMaterial(updated);
+    deleteFromFirestore('tanda_terima_material', id);
+  };
+
   // --- CRUD FinishGood (Pallet) ---
   const addFinishGood = (good: Omit<FinishGood, 'id' | 'terakhirDiperbarui'>) => {
     const id = `plt-${Date.now()}`;
+    const today = good.tanggalMasukProduksi || new Date().toISOString().split('T')[0];
+    const initialQty = Number(good.stok || 0);
+    const stokAwal = good.stokAwal !== undefined ? Number(good.stokAwal) : initialQty;
+    const stokMasuk = good.stokMasukProduksi !== undefined ? Number(good.stokMasukProduksi) : 0;
+    const stokKeluar = good.stokKeluarPengiriman !== undefined ? Number(good.stokKeluarPengiriman) : 0;
+    const stok = initialQty;
+
+    const initialMutasiFG: FinishGoodMutasiItem[] = good.riwayatMutasiFG && good.riwayatMutasiFG.length > 0
+      ? good.riwayatMutasiFG
+      : stok > 0 ? [{
+          id: `mutfg-${Date.now()}`,
+          tanggal: today,
+          tipe: 'MASUK_PRODUKSI',
+          jumlah: stok,
+          sisaStokSetelahnya: stok,
+          keterangan: 'Stok Awal / Saldo Awal Pallet Jadi',
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        }] : [];
+
     const newGood: FinishGood = {
       ...good,
       id,
+      stokAwal,
+      stokMasukProduksi: stokMasuk,
+      stokKeluarPengiriman: stokKeluar,
+      stok,
+      tanggalMasukProduksi: today,
+      tanggalKeluarTerakhir: good.tanggalKeluarTerakhir || '',
+      stokFisikOpname: good.stokFisikOpname !== undefined ? good.stokFisikOpname : stok,
+      selisihOpname: good.selisihOpname !== undefined ? good.selisihOpname : 0,
+      riwayatMutasiFG: initialMutasiFG,
       terakhirDiperbarui: new Date().toISOString()
     };
     const updated = [newGood, ...finishGoods];
@@ -1027,11 +1254,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const adjustFinishGoodStock = (id: string, amount: number) => {
     let updatedItem: FinishGood | null = null;
+    const today = new Date().toISOString().split('T')[0];
     const updated = finishGoods.map(item => {
       if (item.id === id) {
+        const nextStok = Math.max(0, item.stok + amount);
+        const stokMasuk = amount > 0 ? (item.stokMasukProduksi || 0) + amount : (item.stokMasukProduksi || 0);
+        const stokKeluar = amount < 0 ? (item.stokKeluarPengiriman || 0) + Math.abs(amount) : (item.stokKeluarPengiriman || 0);
+        
+        const mutasiEntry: FinishGoodMutasiItem = {
+          id: `mutfg-${Date.now()}`,
+          tanggal: today,
+          tipe: amount >= 0 ? 'MASUK_PRODUKSI' : 'KELUAR_PENGIRIMAN',
+          jumlah: Math.abs(amount),
+          sisaStokSetelahnya: nextStok,
+          keterangan: amount >= 0 ? 'Penyesuaian Masuk Manual' : 'Penyesuaian Keluar Pengiriman Manual',
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        };
+
         updatedItem = {
           ...item,
-          stok: Math.max(0, item.stok + amount),
+          stok: nextStok,
+          stokMasukProduksi: stokMasuk,
+          stokKeluarPengiriman: stokKeluar,
+          tanggalMasukProduksi: amount > 0 ? today : item.tanggalMasukProduksi,
+          tanggalKeluarTerakhir: amount < 0 ? today : item.tanggalKeluarTerakhir,
+          riwayatMutasiFG: [mutasiEntry, ...(item.riwayatMutasiFG || [])],
           terakhirDiperbarui: new Date().toISOString()
         };
         return updatedItem;
@@ -1040,6 +1287,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     saveFinishGoods(updated);
     if (updatedItem) syncToFirestore('finish_goods', id, updatedItem);
+  };
+
+  const recordFinishGoodMutation = (finishGoodId: string, mutasi: Omit<FinishGoodMutasiItem, 'id'>) => {
+    let updatedItem: FinishGood | null = null;
+    const updated = finishGoods.map(item => {
+      if (item.id === finishGoodId) {
+        const mutasiId = `mutfg-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const qty = Number(mutasi.jumlah);
+        let newStok = item.stok;
+        let stokMasuk = item.stokMasukProduksi || 0;
+        let stokKeluar = item.stokKeluarPengiriman || 0;
+        let tglMasuk = item.tanggalMasukProduksi || '';
+        let tglKeluar = item.tanggalKeluarTerakhir || '';
+
+        if (mutasi.tipe === 'MASUK_PRODUKSI') {
+          newStok = item.stok + qty;
+          stokMasuk += qty;
+          tglMasuk = mutasi.tanggal || new Date().toISOString().split('T')[0];
+        } else if (mutasi.tipe === 'KELUAR_PENGIRIMAN') {
+          newStok = Math.max(0, item.stok - qty);
+          stokKeluar += qty;
+          tglKeluar = mutasi.tanggal || new Date().toISOString().split('T')[0];
+        } else if (mutasi.tipe === 'PENYESUAIAN_OPNAME') {
+          newStok = qty;
+        }
+
+        const newMutasiEntry: FinishGoodMutasiItem = {
+          ...mutasi,
+          id: mutasiId,
+          jumlah: qty,
+          sisaStokSetelahnya: newStok,
+          dicatatOleh: mutasi.dicatatOleh || currentUser?.name || 'Warehouse Admin'
+        };
+
+        updatedItem = {
+          ...item,
+          stok: newStok,
+          stokMasukProduksi: stokMasuk,
+          stokKeluarPengiriman: stokKeluar,
+          tanggalMasukProduksi: tglMasuk,
+          tanggalKeluarTerakhir: tglKeluar,
+          riwayatMutasiFG: [newMutasiEntry, ...(item.riwayatMutasiFG || [])],
+          terakhirDiperbarui: new Date().toISOString()
+        };
+        return updatedItem;
+      }
+      return item;
+    });
+    saveFinishGoods(updated);
+    if (updatedItem) syncToFirestore('finish_goods', finishGoodId, updatedItem);
+  };
+
+  const updateFinishGoodOpname = (finishGoodId: string, stokFisik: number, keterangan?: string) => {
+    let updatedItem: FinishGood | null = null;
+    const today = new Date().toISOString().split('T')[0];
+    const updated = finishGoods.map(item => {
+      if (item.id === finishGoodId) {
+        const qtyFisik = Number(stokFisik);
+        const selisih = qtyFisik - item.stok;
+        const mutasiEntry: FinishGoodMutasiItem = {
+          id: `mutfg-${Date.now()}`,
+          tanggal: today,
+          nomorBukti: `OPNAME-${today}`,
+          tipe: 'PENYESUAIAN_OPNAME',
+          jumlah: qtyFisik,
+          sisaStokSetelahnya: qtyFisik,
+          keterangan: keterangan || `Stock Opname: Fisik ${qtyFisik} pcs, Sistem ${item.stok} pcs (Selisih ${selisih >= 0 ? '+' : ''}${selisih})`,
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        };
+
+        updatedItem = {
+          ...item,
+          stok: qtyFisik,
+          stokFisikOpname: qtyFisik,
+          selisihOpname: selisih,
+          tanggalOpnameTerakhir: today,
+          keteranganOpname: keterangan || `Opname ${today}`,
+          riwayatMutasiFG: [mutasiEntry, ...(item.riwayatMutasiFG || [])],
+          terakhirDiperbarui: new Date().toISOString()
+        };
+        return updatedItem;
+      }
+      return item;
+    });
+    saveFinishGoods(updated);
+    if (updatedItem) syncToFirestore('finish_goods', finishGoodId, updatedItem);
   };
 
   // Manufacturing / Production Simulator
@@ -1061,14 +1394,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    const targetFG = finishGoods.find(f => f.id === finishGoodId);
+    const fgName = targetFG ? targetFG.nama : 'Pallet Kayu';
+
     const updatedMaterials = materials.map(mat => {
       const cm = consumedMaterials.find(c => c.materialId === mat.id);
       if (cm) {
         const usedAmount = cm.amount * quantity;
-        const item = {
+        const nextStok = mat.stok - usedAmount;
+        const nextKeluar = (mat.stokKeluar || 0) + usedAmount;
+
+        const mutasiEntry: MaterialMutasiItem = {
+          id: `mut-${Date.now()}-${mat.id}`,
+          tanggal: today,
+          tipe: 'KELUAR_PRODUKSI',
+          jumlah: usedAmount,
+          sisaStokSetelahnya: nextStok,
+          keperluan: `Produksi ${quantity} pcs ${fgName}`,
+          keterangan: `Pemakaian bahan baku untuk proses assembling/manufaktur ${fgName}`,
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        };
+
+        const item: Material = {
           ...mat,
-          stok: mat.stok - usedAmount,
-          stokKeluar: (mat.stokKeluar || 0) + usedAmount,
+          stok: nextStok,
+          stokKeluar: nextKeluar,
+          riwayatMutasi: [mutasiEntry, ...(mat.riwayatMutasi || [])],
           terakhirDiperbarui: new Date().toISOString()
         };
         syncToFirestore('materials', item.id, item);
@@ -1079,9 +1431,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedFinishGoods = finishGoods.map(fg => {
       if (fg.id === finishGoodId) {
-        const item = {
+        const nextStok = fg.stok + quantity;
+        const nextMasuk = (fg.stokMasukProduksi || 0) + quantity;
+
+        const mutasiEntry: FinishGoodMutasiItem = {
+          id: `mutfg-${Date.now()}`,
+          tanggal: today,
+          tipe: 'MASUK_PRODUKSI',
+          jumlah: quantity,
+          sisaStokSetelahnya: nextStok,
+          keterangan: `Hasil Produksi Pabrik masuk ke Gudang (${quantity} pcs)`,
+          dicatatOleh: currentUser?.name || 'Warehouse Admin'
+        };
+
+        const item: FinishGood = {
           ...fg,
-          stok: fg.stok + quantity,
+          stok: nextStok,
+          stokMasukProduksi: nextMasuk,
+          tanggalMasukProduksi: today,
+          riwayatMutasiFG: [mutasiEntry, ...(fg.riwayatMutasiFG || [])],
           terakhirDiperbarui: new Date().toISOString()
         };
         syncToFirestore('finish_goods', item.id, item);
@@ -1439,13 +1807,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // If status changes from 'Draf' to shipped ('Dalam Perjalanan' or further), reduce Finish Good stock
     if (oldStatus === 'Draf' && status !== 'Draf') {
+      const today = new Date().toISOString().split('T')[0];
       const updatedGoods = finishGoods.map(fg => {
         const sjItem = sjTarget.itemKirim.find(i => i.namaPallet === fg.nama);
         if (sjItem) {
-          const nextStock = Math.max(0, fg.stok - sjItem.jumlahKirim);
-          const item = {
+          const qtyKirim = Number(sjItem.jumlahKirim);
+          const nextStock = Math.max(0, fg.stok - qtyKirim);
+          const nextKeluar = (fg.stokKeluarPengiriman || 0) + qtyKirim;
+
+          const mutasiEntry: FinishGoodMutasiItem = {
+            id: `mutfg-${Date.now()}-${fg.id}`,
+            tanggal: today,
+            nomorBukti: sjTarget.nomorSuratJalan,
+            tipe: 'KELUAR_PENGIRIMAN',
+            jumlah: qtyKirim,
+            sisaStokSetelahnya: nextStock,
+            tujuanPengiriman: sjTarget.pelanggan,
+            sopir: sjTarget.namaSopir,
+            noKendaraan: sjTarget.nomorPolisi,
+            keterangan: `Pengiriman barang via Surat Jalan ${sjTarget.nomorSuratJalan} ke ${sjTarget.pelanggan}`,
+            dicatatOleh: currentUser?.name || 'Warehouse Admin'
+          };
+
+          const item: FinishGood = {
             ...fg,
             stok: nextStock,
+            stokKeluarPengiriman: nextKeluar,
+            tanggalKeluarTerakhir: today,
+            riwayatMutasiFG: [mutasiEntry, ...(fg.riwayatMutasiFG || [])],
             terakhirDiperbarui: new Date().toISOString()
           };
           syncToFirestore('finish_goods', item.id, item);
@@ -1967,6 +2356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBukuBankList([]);
     setAsetList([]);
     setPajakList([]);
+    setTandaTerimaMaterialList([]);
   };
 
   return (
@@ -1983,6 +2373,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       bukuBankList,
       asetList,
       pajakList,
+      tandaTerimaMaterialList,
       currentUser,
       darkMode,
       saldoAwalKasKecil,
@@ -2016,11 +2407,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateMaterial,
       deleteMaterial,
       adjustMaterialStock,
+      recordMaterialMutation,
+      addTandaTerimaMaterial,
+      updateTandaTerimaMaterial,
+      deleteTandaTerimaMaterial,
       addFinishGood,
       updateFinishGood,
       deleteFinishGood,
       adjustFinishGoodStock,
       producePallets,
+      recordFinishGoodMutation,
+      updateFinishGoodOpname,
       addPurchaseOrder,
       updatePurchaseOrder,
       deletePurchaseOrder,
