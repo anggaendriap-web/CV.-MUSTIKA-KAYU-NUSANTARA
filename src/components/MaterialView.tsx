@@ -49,7 +49,7 @@ export const MaterialView: React.FC = () => {
   // Form fields for Material Add / Edit
   const [kode, setKode] = useState('');
   const [nama, setNama] = useState('');
-  const [kategori, setKategori] = useState<Material['kategori']>('Kayu Log');
+  const [kategori, setKategori] = useState<string>('Kayu Log');
   const [ukuran, setUkuran] = useState('');
   const [dimensi, setDimensi] = useState('');
   const [tanggalMasukWarehouse, setTanggalMasukWarehouse] = useState(new Date().toISOString().split('T')[0]);
@@ -1049,16 +1049,21 @@ export const MaterialView: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">KATEGORI JENIS</label>
-                  <select
+                  <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">KATEGORI JENIS (BISA KETIK MANUAL)</label>
+                  <input
+                    type="text"
+                    list="kategori-list"
+                    required
+                    placeholder="Pilih atau ketik kategori..."
                     value={kategori}
-                    onChange={(e) => setKategori(e.target.value as Material['kategori'])}
+                    onChange={(e) => setKategori(e.target.value)}
                     className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
+                  />
+                  <datalist id="kategori-list">
                     {categories.filter(c => c !== 'SEMUA').map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat} value={cat} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
 
                 <div className="space-y-1">

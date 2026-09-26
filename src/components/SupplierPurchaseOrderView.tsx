@@ -1229,57 +1229,43 @@ export const SupplierPurchaseOrderView: React.FC<SupplierPurchaseOrderViewProps>
                 </div>
 
                 <div className="overflow-x-auto border border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold">
                       <tr>
-                        <th className="p-3">Pilih Dari Gudang</th>
-                        <th className="p-3">Nama Material / Barang *</th>
-                        <th className="p-3">Dimensi / Ukuran</th>
-                        <th className="p-3 w-24">Jumlah</th>
-                        <th className="p-3 w-24">Satuan</th>
-                        <th className="p-3 w-36 text-right">Harga Satuan (Rp)</th>
-                        <th className="p-3 w-36 text-right">Subtotal</th>
-                        <th className="p-3 text-center w-12">Hapus</th>
+                        <th className="p-3.5 min-w-[240px]">Nama Material / Barang *</th>
+                        <th className="p-3.5 min-w-[200px]">Dimensi / Ukuran</th>
+                        <th className="p-3.5 w-32">Jumlah</th>
+                        <th className="p-3.5 w-32">Satuan</th>
+                        <th className="p-3.5 w-44 text-right">Harga Satuan (Rp)</th>
+                        <th className="p-3.5 w-44 text-right">Subtotal</th>
+                        <th className="p-3.5 text-center w-16">Hapus</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                       {formData.items.map((item, idx) => (
                         <tr key={idx} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
-                          <td className="p-2.5">
-                            <select
-                              value={item.materialId || ''}
-                              onChange={(e) => handleSelectExistingMaterial(idx, e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs"
-                            >
-                              <option value="">-- Manual / Baru --</option>
-                              {materials.map(m => (
-                                <option key={m.id} value={m.id}>{m.kode} - {m.nama}</option>
-                              ))}
-                            </select>
-                          </td>
-
-                          <td className="p-2.5">
+                          <td className="p-3">
                             <input
                               type="text"
                               required
                               placeholder="Nama material kayu/paku"
                               value={item.namaMaterial}
                               onChange={(e) => handleItemChange(idx, 'namaMaterial', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs"
+                              className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-900 dark:text-white"
                             />
                           </td>
 
-                          <td className="p-2.5">
+                          <td className="p-3">
                             <input
                               type="text"
                               placeholder="Ukuran / spesifikasi"
                               value={item.ukuran || ''}
                               onChange={(e) => handleItemChange(idx, 'ukuran', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs"
+                              className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-xs"
                             />
                           </td>
 
-                          <td className="p-2.5">
+                          <td className="p-3">
                             <input
                               type="number"
                               min="0.1"
@@ -1287,15 +1273,15 @@ export const SupplierPurchaseOrderView: React.FC<SupplierPurchaseOrderViewProps>
                               required
                               value={item.jumlah}
                               onChange={(e) => handleItemChange(idx, 'jumlah', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs font-bold"
+                              className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-xs font-bold text-center"
                             />
                           </td>
 
-                          <td className="p-2.5">
+                          <td className="p-3">
                             <select
                               value={item.satuan}
                               onChange={(e) => handleItemChange(idx, 'satuan', e.target.value)}
-                              className="w-full px-2 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs"
+                              className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-xs font-medium"
                             >
                               <option value="m3">m3</option>
                               <option value="lembar">lembar</option>
@@ -1308,27 +1294,27 @@ export const SupplierPurchaseOrderView: React.FC<SupplierPurchaseOrderViewProps>
                             </select>
                           </td>
 
-                          <td className="p-2.5">
+                          <td className="p-3">
                             <input
                               type="number"
                               min="0"
                               required
                               value={item.hargaSatuan}
                               onChange={(e) => handleItemChange(idx, 'hargaSatuan', e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-xs text-right font-semibold"
+                              className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl text-xs text-right font-bold"
                             />
                           </td>
 
-                          <td className="p-2.5 text-right font-bold text-zinc-900 dark:text-white">
+                          <td className="p-3 text-right font-black text-sm text-zinc-900 dark:text-white">
                             {formatRupiah(item.subtotal)}
                           </td>
 
-                          <td className="p-2.5 text-center">
+                          <td className="p-3 text-center">
                             <button
                               type="button"
                               onClick={() => handleRemoveItemRow(idx)}
                               disabled={formData.items.length <= 1}
-                              className="p-1 text-zinc-400 hover:text-red-600 disabled:opacity-30 disabled:hover:text-zinc-400 rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-zinc-400 hover:text-red-600 disabled:opacity-30 disabled:hover:text-zinc-400 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
