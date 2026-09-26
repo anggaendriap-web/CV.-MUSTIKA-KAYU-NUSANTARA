@@ -114,6 +114,24 @@
       },
       "required": ["nama", "alamat", "telepon"]
     },
+    "Supplier": {
+      "title": "Data Supplier / Rekanan Vendor",
+      "description": "Database supplier bahan baku kayu, log, balok, paku, dan kimia yang otomatis tersimpan saat membuat PO",
+      "type": "object",
+      "properties": {
+        "nama": { "type": "string" },
+        "alamat": { "type": "string" },
+        "telepon": { "type": "string" },
+        "email": { "type": "string" },
+        "pic": { "type": "string" },
+        "kategoriDefault": { "type": "string" },
+        "syaratPembayaranDefault": { "type": "string", "enum": ["COD", "CBD", "Tempo 7 Hari", "Tempo 14 Hari", "Tempo 30 Hari"] },
+        "bankInfo": { "type": "string" },
+        "catatan": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["nama"]
+    },
     "SuratJalan": {
       "title": "Surat Jalan Ekspedisi",
       "description": "Dokumen jalan pengiriman armada truk",

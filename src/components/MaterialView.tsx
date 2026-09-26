@@ -89,6 +89,7 @@ export const MaterialView: React.FC = () => {
 
   // Check Role Permissions: Warehouse & Owner can edit/create.
   const canModify = currentUser?.role === 'OWNER' || currentUser?.role === 'WAREHOUSE';
+  const isWarehouse = currentUser?.role === 'WAREHOUSE';
 
   // Filter & Search Logic for Materials
   const filteredMaterials = materials.filter(item => {
@@ -417,7 +418,7 @@ export const MaterialView: React.FC = () => {
         'Keluar (Produksi)', 
         'Sisa Stok Akhir', 
         'Satuan', 
-        'Harga Beli (Rp)', 
+        ...(!isWarehouse ? ['Harga Beli (Rp)'] : []), 
         'Minimal Buffer', 
         'Lokasi Gudang', 
         'Supplier Utama'
@@ -435,7 +436,7 @@ export const MaterialView: React.FC = () => {
         m.stokKeluar || 0,
         m.stok,
         m.satuan,
-        m.hargaBeli,
+        ...(!isWarehouse ? [m.hargaBeli] : []),
         m.minimalStok,
         m.lokasiGudang || '-',
         m.supplier
@@ -614,7 +615,9 @@ export const MaterialView: React.FC = () => {
                     <th className="p-3.5 text-center whitespace-nowrap text-emerald-700 dark:text-emerald-400">Stok Masuk</th>
                     <th className="p-3.5 text-center whitespace-nowrap text-red-700 dark:text-red-400">Keluar (Produksi)</th>
                     <th className="p-3.5 text-center whitespace-nowrap bg-zinc-100/80 dark:bg-zinc-800/60 font-black">Sisa Stok Akhir</th>
-                    <th className="p-3.5 text-right whitespace-nowrap">Harga Beli</th>
+                    {!isWarehouse && (
+                      <th className="p-3.5 text-right whitespace-nowrap">Harga Beli</th>
+                    )}
                     <th className="p-3.5 whitespace-nowrap">Supplier</th>
                     <th className="p-3.5 text-right whitespace-nowrap">Aksi</th>
                   </tr>
@@ -681,9 +684,11 @@ export const MaterialView: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td className="p-3.5 text-right font-bold text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
-                          Rp {item.hargaBeli.toLocaleString('id-ID')}
-                        </td>
+                        {!isWarehouse && (
+                          <td className="p-3.5 text-right font-bold text-zinc-800 dark:text-zinc-200 whitespace-nowrap">
+                            Rp {item.hargaBeli.toLocaleString('id-ID')}
+                          </td>
+                        )}
                         <td className="p-3.5 text-zinc-600 dark:text-zinc-400 font-medium whitespace-nowrap">
                           {item.supplier || '-'}
                         </td>
@@ -1123,19 +1128,21 @@ export const MaterialView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">HARGA BELI (RP)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="500"
-                    value={hargaBeli}
-                    onChange={(e) => setHargaBeli(Number(e.target.value))}
-                    className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
+              <div className={`grid grid-cols-1 ${!isWarehouse ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
+                {!isWarehouse && (
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">HARGA BELI (RP)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="500"
+                      value={hargaBeli}
+                      onChange={(e) => setHargaBeli(Number(e.target.value))}
+                      className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">MINIMAL BUFFER STOK</label>
@@ -1813,7 +1820,9 @@ export const MaterialView: React.FC = () => {
                       <th className="p-2.5 text-right text-emerald-700">Masuk</th>
                       <th className="p-2.5 text-right text-red-700">Keluar</th>
                       <th className="p-2.5 text-right font-black">Sisa Stok</th>
-                      <th className="p-2.5 text-right">Harga Beli</th>
+                      {!isWarehouse && (
+                        <th className="p-2.5 text-right">Harga Beli</th>
+                      )}
                       <th className="p-2.5">Supplier</th>
                     </tr>
                   </thead>
@@ -1831,9 +1840,11 @@ export const MaterialView: React.FC = () => {
                         <td className="p-2 text-right font-mono font-black text-zinc-900">
                           {m.stok} {m.satuan}
                         </td>
-                        <td className="p-2 text-right font-mono text-zinc-650">
-                          Rp {m.hargaBeli.toLocaleString('id-ID')}
-                        </td>
+                        {!isWarehouse && (
+                          <td className="p-2 text-right font-mono text-zinc-650">
+                            Rp {m.hargaBeli.toLocaleString('id-ID')}
+                          </td>
+                        )}
                         <td className="p-2 text-zinc-500 font-medium">{m.supplier}</td>
                       </tr>
                     ))}

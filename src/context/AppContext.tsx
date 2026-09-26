@@ -18,7 +18,8 @@ import {
   MaterialMutasiItem,
   FinishGoodMutasiItem,
   PurchaseOrderSupplier,
-  POSupplierItem
+  POSupplierItem,
+  Supplier
 } from '../types';
 import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
 import { calculateDueDateFromInvoice } from '../utils/paymentTerms';
@@ -28,6 +29,7 @@ interface AppContextProps {
   finishGoods: FinishGood[];
   purchaseOrders: PurchaseOrder[];
   poSuppliers: PurchaseOrderSupplier[];
+  suppliers: Supplier[];
   suratJalanList: SuratJalan[];
   keuanganList: Keuangan[];
   customers: Customer[];
@@ -120,7 +122,16 @@ interface AppContextProps {
   updatePOSupplier: (id: string, po: Partial<PurchaseOrderSupplier>) => void;
   deletePOSupplier: (id: string) => void;
   updatePOSupplierStatus: (id: string, status: PurchaseOrderSupplier['statusPO']) => void;
-  terimaBarangPOSupplier: (id: string, keterangan?: string) => { success: boolean; message: string };
+  terimaBarangPOSupplier: (
+    id: string, 
+    keterangan?: string, 
+    receivedItems?: { namaMaterial: string; jumlahDiterima: number }[]
+  ) => { success: boolean; message: string; statusPO?: PurchaseOrderSupplier['statusPO']; totalNilaiDiterima?: number };
+
+  // Supplier Database actions
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => string;
+  updateSupplier: (id: string, supplier: Partial<Supplier>) => void;
+  deleteSupplier: (id: string) => void;
 
   // Customer actions
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => void;
@@ -282,6 +293,61 @@ export const DEFAULT_PO_SUPPLIERS: PurchaseOrderSupplier[] = [
   }
 ];
 
+export const DEFAULT_SUPPLIERS: Supplier[] = [
+  {
+    id: 'sup-1',
+    nama: 'PT Sumber Kayu Lestari',
+    alamat: 'Jl. Raya Magelang KM 14, Sleman, DI Yogyakarta',
+    telepon: '0812-3456-7890',
+    email: 'sales@sumberkayulestari.com',
+    pic: 'Bpk. H. Sudirman',
+    kategoriDefault: 'Bahan Baku Kayu',
+    syaratPembayaranDefault: 'Tempo 30 Hari',
+    bankInfo: 'Bank BCA 802-991-8821 a.n PT Sumber Kayu Lestari',
+    catatan: 'Penyuplai utama kayu log sengon albasia dan mahoni sertifikasi SVLK',
+    createdAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'sup-2',
+    nama: 'CV Log Makmur Abadi',
+    alamat: 'Kutoarjo, Purworejo, Jawa Tengah',
+    telepon: '0857-8910-1122',
+    email: 'logmakmurabadi@gmail.com',
+    pic: 'Ibu Ratna Susanti',
+    kategoriDefault: 'Bahan Baku Kayu',
+    syaratPembayaranDefault: 'Tempo 14 Hari',
+    bankInfo: 'Bank Mandiri 137-00-881299-1 a.n CV Log Makmur Abadi',
+    catatan: 'Spesialis papan mahoni dan albasia kering oven kiln dry',
+    createdAt: '2026-08-05T08:00:00Z'
+  },
+  {
+    id: 'sup-3',
+    nama: 'PT Baja Paku Nusantara',
+    alamat: 'Kawasan Industri Candi Blok 8, Semarang',
+    telepon: '024-7612345',
+    email: 'order@bajapakunusantara.com',
+    pic: 'Bpk. Eko Wibowo',
+    kategoriDefault: 'Paku & Besi',
+    syaratPembayaranDefault: 'Tempo 30 Hari',
+    bankInfo: 'Bank Mandiri 135-00-192837-4 a.n PT Baja Paku Nusantara',
+    catatan: 'Pemasok paku koil tembak pneumatic (coil nails) dan kawat pallet',
+    createdAt: '2026-08-08T08:00:00Z'
+  },
+  {
+    id: 'sup-4',
+    nama: 'PT Mitra Preservasi Kayu Abadi',
+    alamat: 'Jl. Industri Rungkut No. 12, Surabaya',
+    telepon: '0811-2233-4455',
+    email: 'info@mitrapreservasi.com',
+    pic: 'Ir. Budi Santoso',
+    kategoriDefault: 'Lainnya',
+    syaratPembayaranDefault: 'Tempo 30 Hari',
+    bankInfo: 'Bank BNI 091-882-7711 a.n PT Mitra Preservasi Kayu',
+    catatan: 'Bahan kimia anti rayap, anti jamur, dan formula sertifikasi ISPM-15',
+    createdAt: '2026-08-10T08:00:00Z'
+  }
+];
+
 export const DEFAULT_HUTANG_FROM_POS: HutangUsaha[] = [
   {
     id: 'ap-po-posup-1',
@@ -407,6 +473,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch { return DEFAULT_PO_SUPPLIERS; }
     }
     return DEFAULT_PO_SUPPLIERS;
+  });
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    const cached = localStorage.getItem('mk_suppliers');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as Supplier[];
+        const filtered = parsed.filter(s => !deletedDocIdsRef.current.has(s.id));
+        const existingIds = new Set(filtered.map(s => s.id));
+        const missingDefaults = DEFAULT_SUPPLIERS.filter(d => !existingIds.has(d.id) && !deletedDocIdsRef.current.has(d.id));
+        if (missingDefaults.length > 0) {
+          const merged = [...filtered, ...missingDefaults];
+          localStorage.setItem('mk_suppliers', JSON.stringify(merged));
+          return merged;
+        }
+        return filtered;
+      } catch { return DEFAULT_SUPPLIERS; }
+    }
+    return DEFAULT_SUPPLIERS;
   });
 
   const [suratJalanList, setSuratJalanList] = useState<SuratJalan[]>(() => {
@@ -771,6 +856,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Firestore po_suppliers sync fallback:', err);
       });
 
+      const unsubSuppliers = onSnapshot(collection(db, 'suppliers'), (snap) => {
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as Supplier));
+        setSuppliers(list);
+        localStorage.setItem('mk_suppliers', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore suppliers sync fallback:', err);
+      });
+
       const unsubSJ = onSnapshot(collection(db, 'surat_jalan'), (snap) => {
         const list = snap.docs
           .filter(d => !deletedDocIdsRef.current.has(d.id))
@@ -904,6 +1001,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setMaterials(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setFinishGoods(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setPurchaseOrders(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setPOSuppliers(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
+            setSuppliers(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setSuratJalanList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setKeuanganList(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
             setCustomers(prev => prev.filter(item => !deletedDocIdsRef.current.has(item.id)));
@@ -1016,6 +1115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubFinishGoods();
         unsubPOs();
         unsubPOSuppliers();
+        unsubSuppliers();
         unsubSJ();
         unsubKeuangan();
         unsubCustomers();
@@ -1061,6 +1161,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const savePOSuppliers = (newPOSup: PurchaseOrderSupplier[]) => {
     setPOSuppliers(newPOSup);
     localStorage.setItem('mk_po_suppliers', JSON.stringify(newPOSup));
+  };
+
+  const saveSuppliers = (newSupp: Supplier[]) => {
+    setSuppliers(newSupp);
+    localStorage.setItem('mk_suppliers', JSON.stringify(newSupp));
   };
 
   const saveSuratJalan = (newSJ: SuratJalan[]) => {
@@ -1985,56 +2090,174 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updatedItem) syncToFirestore('po_suppliers', id, updatedItem);
   };
 
-  const terimaBarangPOSupplier = (id: string, keterangan?: string): { success: boolean; message: string } => {
+  const terimaBarangPOSupplier = (
+    id: string, 
+    keterangan?: string,
+    receivedItems?: { namaMaterial: string; jumlahDiterima: number }[]
+  ): { success: boolean; message: string; statusPO?: PurchaseOrderSupplier['statusPO']; totalNilaiDiterima?: number } => {
     const po = poSuppliers.find(p => p.id === id);
     if (!po) return { success: false, message: 'PO Supplier tidak ditemukan' };
-
-    updatePOSupplierStatus(id, 'Diterima Gudang');
 
     const today = new Date().toISOString().split('T')[0];
     let updatedMaterialsList = [...materials];
 
-    po.items.forEach(item => {
-      const idx = updatedMaterialsList.findIndex(m => 
-        (item.materialId && m.id === item.materialId) ||
-        (item.kodeMaterial && m.kode?.toLowerCase() === item.kodeMaterial.toLowerCase()) ||
-        m.nama.toLowerCase().trim() === item.namaMaterial.toLowerCase().trim()
+    // Tentukan jumlah barang yang diterima per item
+    let allFulfilled = true;
+    let anyReceived = false;
+
+    const updatedItems = po.items.map(item => {
+      const rec = receivedItems?.find(r => 
+        r.namaMaterial.toLowerCase().trim() === item.namaMaterial.toLowerCase().trim()
       );
+      
+      // Jumlah fisik yang diterima nyata di gudang
+      const newTotalReceived = rec !== undefined 
+        ? Math.max(0, Number(rec.jumlahDiterima)) 
+        : (item.jumlahDiterima !== undefined ? item.jumlahDiterima : item.jumlah);
+      
+      const prevReceived = item.jumlahDiterima || 0;
+      const incrementalReceived = Math.max(0, newTotalReceived - prevReceived);
 
-      if (idx !== -1) {
-        const currentMat = updatedMaterialsList[idx];
-        const newStok = currentMat.stok + item.jumlah;
-        const newMasuk = (currentMat.stokMasuk || 0) + item.jumlah;
-        const mutasiEntry: MaterialMutasiItem = {
-          id: `mutmat-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          tanggal: today,
-          nomorBukti: po.nomorPO,
-          tipe: 'MASUK_WAREHOUSE',
-          jumlah: item.jumlah,
-          sisaStokSetelahnya: newStok,
-          pengambil: currentUser?.name || 'Staff Gudang',
-          penyerah: po.supplier,
-          keperluan: `Penerimaan Barang PO Supplier ${po.nomorPO}`,
-          keterangan: keterangan || `Masuk Gudang: ${item.jumlah} ${item.satuan} dari ${po.supplier}`,
-          dicatatOleh: currentUser?.name || 'Admin Sales'
-        };
-
-        const updatedMat: Material = {
-          ...currentMat,
-          stok: newStok,
-          stokMasuk: newMasuk,
-          tanggalMasukWarehouse: today,
-          riwayatMutasi: [mutasiEntry, ...(currentMat.riwayatMutasi || [])],
-          terakhirDiperbarui: new Date().toISOString()
-        };
-
-        updatedMaterialsList[idx] = updatedMat;
-        syncToFirestore('materials', updatedMat.id, updatedMat);
+      if (newTotalReceived < item.jumlah) {
+        allFulfilled = false;
       }
+      if (newTotalReceived > 0) {
+        anyReceived = true;
+      }
+
+      // Update stok material gudang HANYA sebesar jumlah fisik yang baru diterima (incremental)
+      if (incrementalReceived > 0) {
+        const idx = updatedMaterialsList.findIndex(m => 
+          (item.materialId && m.id === item.materialId) ||
+          (item.kodeMaterial && m.kode?.toLowerCase() === item.kodeMaterial.toLowerCase()) ||
+          m.nama.toLowerCase().trim() === item.namaMaterial.toLowerCase().trim()
+        );
+
+        if (idx !== -1) {
+          const currentMat = updatedMaterialsList[idx];
+          const newStok = currentMat.stok + incrementalReceived;
+          const newMasuk = (currentMat.stokMasuk || 0) + incrementalReceived;
+          const mutasiEntry: MaterialMutasiItem = {
+            id: `mutmat-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            tanggal: today,
+            nomorBukti: po.nomorPO,
+            tipe: 'MASUK_WAREHOUSE',
+            jumlah: incrementalReceived,
+            sisaStokSetelahnya: newStok,
+            pengambil: currentUser?.name || 'Staff Gudang',
+            penyerah: po.supplier,
+            keperluan: `Penerimaan Barang PO Supplier ${po.nomorPO}`,
+            keterangan: keterangan || `Masuk Gudang: ${incrementalReceived} ${item.satuan} dari ${po.supplier} (Total Diterima: ${newTotalReceived}/${item.jumlah} ${item.satuan})`,
+            dicatatOleh: currentUser?.name || 'Staff Gudang'
+          };
+
+          const updatedMat: Material = {
+            ...currentMat,
+            stok: newStok,
+            stokMasuk: newMasuk,
+            tanggalMasukWarehouse: today,
+            riwayatMutasi: [mutasiEntry, ...(currentMat.riwayatMutasi || [])],
+            terakhirDiperbarui: new Date().toISOString()
+          };
+
+          updatedMaterialsList[idx] = updatedMat;
+          syncToFirestore('materials', updatedMat.id, updatedMat);
+        }
+      }
+
+      return {
+        ...item,
+        jumlahDiterima: newTotalReceived,
+        subtotalDiterima: newTotalReceived * item.hargaSatuan
+      };
     });
 
     saveMaterials(updatedMaterialsList);
-    return { success: true, message: `Barang dari PO ${po.nomorPO} berhasil diterima di gudang & stok material telah diupdate!` };
+
+    // Hitung total nilai riil barang yang diterima untuk dasar Hutang Usaha (AP)
+    const subtotalReceived = updatedItems.reduce((acc, it) => acc + (it.subtotalDiterima || 0), 0);
+    const taxRatio = po.subtotal > 0 ? (subtotalReceived / po.subtotal) : 1;
+    const ppnReal = po.ppnNominal ? Math.round(po.ppnNominal * taxRatio) : 0;
+    const pphReal = po.pphNominal ? Math.round(po.pphNominal * taxRatio) : 0;
+    const biayaKirimReal = subtotalReceived > 0 ? (po.biayaKirim || 0) : 0;
+    const totalNilaiDiterima = subtotalReceived + ppnReal + biayaKirimReal - pphReal;
+
+    const newStatusPO: PurchaseOrderSupplier['statusPO'] = 
+      allFulfilled ? 'Diterima Gudang' : anyReceived ? 'Diterima Sebagian' : po.statusPO;
+
+    // Update PO Supplier
+    const updatedPO: PurchaseOrderSupplier = {
+      ...po,
+      items: updatedItems,
+      totalNilaiDiterima,
+      statusPO: newStatusPO,
+      tanggalDiterima: today,
+      penerimaGudang: currentUser?.name || 'Staff Gudang',
+      catatanPenerimaan: keterangan || po.catatanPenerimaan
+    };
+
+    const nextPOs = poSuppliers.map(p => p.id === id ? updatedPO : p);
+    savePOSuppliers(nextPOs);
+    syncToFirestore('po_suppliers', id, updatedPO);
+
+    // Sinkronisasi Hutang Usaha (AP): Tagihan AP dihitung riil berdasarkan jumlah barang yang diterima!
+    const targetApId = po.apId || `ap-po-${id}`;
+    const existingHutang = hutangList.find(h => h.id === targetApId || h.poSupplierId === id);
+    if (existingHutang) {
+      const nextTotalTagihan = totalNilaiDiterima;
+      const nextSisa = Math.max(0, nextTotalTagihan - existingHutang.sudahDibayar);
+      const nextStatusAP: HutangUsaha['status'] = nextSisa === 0 && nextTotalTagihan > 0 
+        ? 'Lunas' 
+        : existingHutang.sudahDibayar > 0 ? 'Sebagian' : 'Belum Lunas';
+
+      const itemsDesc = updatedItems.map(i => `${i.namaMaterial} (Diterima ${i.jumlahDiterima || 0}/${i.jumlah} ${i.satuan})`).join(', ');
+
+      updateHutang(existingHutang.id, {
+        totalTagihan: nextTotalTagihan,
+        sisaHutang: nextSisa,
+        status: nextStatusAP,
+        keterangan: `PO Supplier ${po.nomorPO} [${newStatusPO}]: ${itemsDesc}`
+      });
+    }
+
+    const message = allFulfilled 
+      ? `Semua barang PO ${po.nomorPO} telah diterima penuh (Nilai AP Riil: Rp ${totalNilaiDiterima.toLocaleString('id-ID')}). Stok material gudang & tagihan hutang AP telah disesuaikan!`
+      : `Barang PO ${po.nomorPO} diterima sebagian (Nilai AP Riil: Rp ${totalNilaiDiterima.toLocaleString('id-ID')}). Stok material gudang bertambah sesuai fisik dan hutang AP disesuaikan dengan barang yang datang!`;
+
+    return { success: true, message, statusPO: newStatusPO, totalNilaiDiterima };
+  };
+
+  // --- CRUD Suppliers (Database Supplier Vendor) ---
+  const addSupplier = (supplier: Omit<Supplier, 'id' | 'createdAt'>): string => {
+    const id = `sup-${Date.now()}`;
+    const newSupp: Supplier = {
+      ...supplier,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newSupp, ...suppliers];
+    saveSuppliers(updated);
+    syncToFirestore('suppliers', id, newSupp);
+    return id;
+  };
+
+  const updateSupplier = (id: string, supplier: Partial<Supplier>) => {
+    let updatedItem: Supplier | null = null;
+    const updated = suppliers.map(item => {
+      if (item.id === id) {
+        updatedItem = { ...item, ...supplier };
+        return updatedItem;
+      }
+      return item;
+    });
+    saveSuppliers(updated);
+    if (updatedItem) syncToFirestore('suppliers', id, updatedItem);
+  };
+
+  const deleteSupplier = (id: string) => {
+    const updated = suppliers.filter(item => item.id !== id);
+    saveSuppliers(updated);
+    deleteFromFirestore('suppliers', id);
   };
 
   // --- CRUD Customers ---
@@ -2686,6 +2909,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     finishGoods.forEach(f => deleteFromFirestore('finish_goods', f.id));
     purchaseOrders.forEach(p => deleteFromFirestore('purchase_orders', p.id));
     poSuppliers.forEach(p => deleteFromFirestore('po_suppliers', p.id));
+    suppliers.forEach(s => deleteFromFirestore('suppliers', s.id));
     suratJalanList.forEach(s => deleteFromFirestore('surat_jalan', s.id));
     keuanganList.forEach(k => deleteFromFirestore('keuangan', k.id));
     customers.forEach(c => deleteFromFirestore('customers', c.id));
@@ -2700,6 +2924,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mk_finish_goods', JSON.stringify([]));
     localStorage.setItem('mk_purchase_orders', JSON.stringify([]));
     localStorage.setItem('mk_po_suppliers', JSON.stringify([]));
+    localStorage.setItem('mk_suppliers', JSON.stringify([]));
     localStorage.setItem('mk_surat_jalan', JSON.stringify([]));
     localStorage.setItem('mk_keuangan', JSON.stringify([]));
     localStorage.setItem('mk_customers', JSON.stringify([]));
@@ -2714,6 +2939,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFinishGoods([]);
     setPurchaseOrders([]);
     setPOSuppliers([]);
+    setSuppliers([]);
     setSuratJalanList([]);
     setKeuanganList([]);
     setCustomers([]);
@@ -2732,6 +2958,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       finishGoods,
       purchaseOrders,
       poSuppliers,
+      suppliers,
       suratJalanList,
       keuanganList,
       customers,
@@ -2796,6 +3023,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deletePOSupplier,
       updatePOSupplierStatus,
       terimaBarangPOSupplier,
+      addSupplier,
+      updateSupplier,
+      deleteSupplier,
       addCustomer,
       updateCustomer,
       deleteCustomer,

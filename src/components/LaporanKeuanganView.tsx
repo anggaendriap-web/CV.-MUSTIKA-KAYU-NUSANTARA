@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { CompanyLogo } from './CompanyLogo';
-import { triggerPrintOrPdf } from '../utils/exportPdf';
+import { triggerPrintOrPdf, downloadElementAsPdf } from '../utils/exportPdf';
 import { 
   BarChart3, 
   Printer, 
@@ -17,7 +17,8 @@ import {
   PieChart,
   Edit3,
   Info,
-  HelpCircle
+  HelpCircle,
+  FileCheck
 } from 'lucide-react';
 
 export const LaporanKeuanganView: React.FC = () => {
@@ -54,6 +55,7 @@ export const LaporanKeuanganView: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printReportType, setPrintReportType] = useState<'gabungan' | 'laba_rugi' | 'neraca' | 'arus_kas'>('gabungan');
   
   // HPP & Beban Edit Modals & Explanation Card States
   const [showEditHPPModal, setShowEditHPPModal] = useState(false);
@@ -329,11 +331,15 @@ export const LaporanKeuanganView: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowPrintModal(true)}
+            onClick={() => {
+              setPrintReportType(activeTab === 'arus_kas' ? 'arus_kas' : 'gabungan');
+              setShowPrintModal(true);
+            }}
             className="flex items-center gap-2 px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
+            title="Cetak Neraca & Laba Rugi Sekaligus atau Terpisah"
           >
             <Printer className="h-4 w-4" />
-            <span>Cetak {activeTab === 'laba_rugi' ? 'Laba Rugi' : activeTab === 'neraca' ? 'Neraca' : 'Arus Kas'} PDF</span>
+            <span>Cetak Neraca & Laba Rugi (PDF)</span>
           </button>
         </div>
       </div>
@@ -926,125 +932,685 @@ export const LaporanKeuanganView: React.FC = () => {
 
       {/* PRINT MODAL */}
       {showPrintModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-4xl w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 bg-zinc-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Printer className="h-5 w-5 text-red-400" />
-                <span className="font-bold text-sm">Pratinjau Laporan Keuangan Resmi</span>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-5xl w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            
+            {/* Modal Header */}
+            <div className="p-4 bg-zinc-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-950/80 rounded-lg text-red-400 border border-red-800/50">
+                  <Printer className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm sm:text-base tracking-tight">Pratinjau Cetak Laporan Keuangan Resmi</span>
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-900/60 border border-emerald-700/60 text-emerald-300 font-bold rounded-full">
+                      Siap Cetak A4 / PDF
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400">CV. Mustika Kayu Nusantara — Periode {startDate} s/d {endDate}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
-                  onClick={() => triggerPrintOrPdf('financial-statement-sheet', `Laporan_Keuangan_${activeTab}_${startDate}_sd_${endDate}`)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                  onClick={async () => {
+                    const cleanStart = startDate || 'awal';
+                    const cleanEnd = endDate || 'akhir';
+                    const filename = printReportType === 'gabungan'
+                      ? `Laporan_Keuangan_Lengkap_Neraca_dan_Laba_Rugi_${cleanStart}_sd_${cleanEnd}`
+                      : printReportType === 'laba_rugi'
+                      ? `Laporan_Laba_Rugi_${cleanStart}_sd_${cleanEnd}`
+                      : printReportType === 'neraca'
+                      ? `Laporan_Neraca_${cleanEnd}`
+                      : `Laporan_Arus_Kas_${cleanStart}_sd_${cleanEnd}`;
+                    await downloadElementAsPdf('financial-statement-sheet', filename);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  title="Unduh file dokumen PDF"
                 >
                   <Download className="h-4 w-4" />
-                  <span>Download / Print PDF</span>
+                  <span>Download PDF Resmi</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    const cleanStart = startDate || 'awal';
+                    const cleanEnd = endDate || 'akhir';
+                    const filename = printReportType === 'gabungan'
+                      ? `Laporan_Keuangan_Lengkap_Neraca_dan_Laba_Rugi_${cleanStart}_sd_${cleanEnd}`
+                      : printReportType === 'laba_rugi'
+                      ? `Laporan_Laba_Rugi_${cleanStart}_sd_${cleanEnd}`
+                      : printReportType === 'neraca'
+                      ? `Laporan_Neraca_${cleanEnd}`
+                      : `Laporan_Arus_Kas_${cleanStart}_sd_${cleanEnd}`;
+                    await triggerPrintOrPdf('financial-statement-sheet', filename);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold transition-all border border-zinc-700 cursor-pointer"
+                  title="Buka jendela cetak printer fisik"
+                >
+                  <Printer className="h-4 w-4 text-zinc-300" />
+                  <span>Cetak Printer</span>
                 </button>
                 <button
                   onClick={() => setShowPrintModal(false)}
-                  className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  className="p-2 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+                  title="Tutup Pratinjau"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto bg-zinc-100 dark:bg-zinc-950 flex justify-center">
-              <div
-                id="financial-statement-sheet"
-                className="bg-white text-zinc-900 p-8 rounded-lg shadow-md max-w-3xl w-full text-xs font-sans border border-zinc-200"
-              >
-                <div className="flex items-start justify-between border-b-2 border-red-900 pb-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <CompanyLogo size="md" className="h-12 w-12" />
-                    <div>
-                      <h2 className="text-xl font-black text-red-900">PT MUSTIKA KAYU NUSANTARA</h2>
-                      <p className="text-[10px] text-zinc-600">
-                        {activeTab === 'laba_rugi' ? 'LAPORAN LABA RUGI KOMPREHENSIF' : activeTab === 'neraca' ? 'LAPORAN POSISI KEUANGAN (NERACA)' : 'LAPORAN ARUS KAS'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right text-[10px] text-zinc-600">
-                    <p><b>Periode:</b> {startDate} s/d {endDate}</p>
-                    <p><b>Mata Uang:</b> Indonesian Rupiah (IDR)</p>
-                  </div>
-                </div>
-
-                {/* Print Content based on tab */}
-                {activeTab === 'laba_rugi' && (
-                  <div className="space-y-3">
-                    <div className="flex justify-between py-1.5 border-b font-bold text-zinc-900">
-                      <span>I. PENDAPATAN OPERASIONAL (PENJUALAN PALLET)</span>
-                      <span>{formatRupiah(totalRevenue)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 text-zinc-600 pl-4">
-                      <span>Harga Pokok Penjualan (HPP Kayu, Paku, Oven ISPM 15, Upah)</span>
-                      <span>({formatRupiah(totalHPP)})</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 bg-zinc-100 font-bold px-2">
-                      <span>LABA KOTOR (GROSS PROFIT)</span>
-                      <span className="text-red-900">{formatRupiah(labaKotor)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 text-zinc-600 pl-4">
-                      <span>Total Beban Operasional, Gaji, Listrik, Depresiasi Aset</span>
-                      <span>({formatRupiah(totalBebanOperasional)})</span>
-                    </div>
-                    <div className="flex justify-between py-1 text-zinc-600 pl-4">
-                      <span>Estimasi Beban Pajak Penghasilan</span>
-                      <span>({formatRupiah(estimasiPajak)})</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-t-2 border-b-2 border-red-900 font-black text-sm">
-                      <span className="text-red-900">LABA BERSIH PERIODE BERJALAN</span>
-                      <span className="text-red-900">{formatRupiah(labaBersih)}</span>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'neraca' && (
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="border-r border-zinc-200 pr-4 space-y-2">
-                      <span className="font-black text-red-900 block border-b pb-1">ASET (AKTIVA)</span>
-                      <div className="flex justify-between text-zinc-600"><span>Kas & Bank</span><span className="font-bold text-zinc-900">{formatRupiah(kasKecil + kasBank)}</span></div>
-                      <div className="flex justify-between text-zinc-600"><span>Piutang Usaha</span><span className="font-bold text-zinc-900">{formatRupiah(piutangUsaha)}</span></div>
-                      <div className="flex justify-between text-zinc-600"><span>Persediaan Stok</span><span className="font-bold text-zinc-900">{formatRupiah(nilaiStokMaterial + nilaiStokFinishGoods)}</span></div>
-                      <div className="flex justify-between text-zinc-600"><span>Aset Tetap Bersih</span><span className="font-bold text-zinc-900">{formatRupiah(totalNilaiBukuAset)}</span></div>
-                      <div className="flex justify-between py-2 border-t border-b font-black text-red-900">
-                        <span>TOTAL ASET</span>
-                        <span>{formatRupiah(grandTotalAset)}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <span className="font-black text-red-900 block border-b pb-1">LIABILITAS & EKUITAS</span>
-                      <div className="flex justify-between text-zinc-600"><span>Hutang Usaha (AP)</span><span className="font-bold text-zinc-900">{formatRupiah(hutangUsahaSupplier)}</span></div>
-                      <div className="flex justify-between text-zinc-600"><span>Hutang Pajak</span><span className="font-bold text-zinc-900">{formatRupiah(hutangBiayaPajak)}</span></div>
-                      <div className="flex justify-between text-zinc-600"><span>Modal Disetor</span><span className="font-bold text-zinc-900">{formatRupiah(modalDisetor)}</span></div>
-                      <div className="flex justify-between text-zinc-600"><span>Laba Ditahan & Berjalan</span><span className="font-bold text-zinc-900">{formatRupiah(labaDitahan + labaBersih)}</span></div>
-                      <div className="flex justify-between py-2 border-t border-b font-black text-red-900">
-                        <span>TOTAL PASIVA</span>
-                        <span>{formatRupiah(grandTotalLiabilitasEkuitas)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Signatures */}
-                <div className="grid grid-cols-2 gap-8 pt-8 mt-6 text-center">
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block mb-12">Disiapkan Oleh,</span>
-                    <div className="border-t border-zinc-400 w-36 mx-auto pt-1 font-bold text-zinc-900">
-                      Finance & Accounting
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 block mb-12">Disetujui Oleh (Direktur Utama),</span>
-                    <div className="border-t border-zinc-400 w-36 mx-auto pt-1 font-bold text-zinc-900">
-                      Direktur Utama
-                    </div>
-                  </div>
+            {/* Mode Cetak Selector Bar */}
+            <div className="bg-zinc-100 dark:bg-zinc-950 px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">Pilihan Laporan:</span>
+                <div className="flex items-center p-0.5 bg-zinc-200 dark:bg-zinc-800 rounded-xl gap-1">
+                  <button
+                    onClick={() => setPrintReportType('gabungan')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      printReportType === 'gabungan'
+                        ? 'bg-red-800 text-white shadow-sm'
+                        : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900'
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Neraca & Laba Rugi Sekaligus (Lengkap 2 Hal)</span>
+                  </button>
+                  <button
+                    onClick={() => setPrintReportType('laba_rugi')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      printReportType === 'laba_rugi'
+                        ? 'bg-red-800 text-white shadow-sm'
+                        : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900'
+                    }`}
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span>Laba Rugi Saja</span>
+                  </button>
+                  <button
+                    onClick={() => setPrintReportType('neraca')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      printReportType === 'neraca'
+                        ? 'bg-red-800 text-white shadow-sm'
+                        : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900'
+                    }`}
+                  >
+                    <Scale className="h-3.5 w-3.5" />
+                    <span>Neraca Saja</span>
+                  </button>
+                  <button
+                    onClick={() => setPrintReportType('arus_kas')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      printReportType === 'arus_kas'
+                        ? 'bg-red-800 text-white shadow-sm'
+                        : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900'
+                    }`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Arus Kas Saja</span>
+                  </button>
                 </div>
               </div>
+
+              <div className="text-[11px] text-zinc-500 font-medium hidden sm:block">
+                {printReportType === 'gabungan' && '✓ Mencetak Neraca & Laba Rugi berurutan dalam 1 file PDF lengkap tanpa terpotong.'}
+                {printReportType === 'laba_rugi' && '✓ Laporan Laba Rugi Komprehensif lengkap dengan rincian pendapatan & HPP.'}
+                {printReportType === 'neraca' && '✓ Laporan Posisi Keuangan (Neraca) lengkap Aktiva & Pasiva seimbang.'}
+                {printReportType === 'arus_kas' && '✓ Laporan Arus Kas metode langsung operasional, investasi, & pendanaan.'}
+              </div>
             </div>
+
+            {/* Document Printable View Area */}
+            <div className="p-4 sm:p-6 overflow-y-auto bg-zinc-200/80 dark:bg-zinc-950 flex flex-col items-center">
+              <div id="financial-statement-sheet" className="w-full flex flex-col items-center max-w-[210mm]">
+
+                {/* ===== SHEET 1: LABA RUGI (Tampil saat 'gabungan' atau 'laba_rugi') ===== */}
+                {(printReportType === 'gabungan' || printReportType === 'laba_rugi') && (
+                  <div className="pdf-page-sheet printable-sheet bg-white text-zinc-900 p-8 sm:p-10 rounded-xl shadow-lg w-full text-xs font-sans border border-zinc-300 mb-6">
+                    {/* Kop Surat Resmi CV. Mustika Kayu Nusantara */}
+                    <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3.5">
+                        <CompanyLogo className="w-12 h-12 flex-shrink-0" />
+                        <div>
+                          <h1 className="font-extrabold text-base tracking-tight text-[#2E7D32]">
+                            CV. MUSTIKA KAYU NUSANTARA
+                          </h1>
+                          <p className="text-[10px] text-zinc-600 font-medium">
+                            Supplier Kayu Olahan, Aneka Industri Kayu, Pallet Kayu Standar & Ekspor ISPM-15
+                          </p>
+                          <p className="text-[9px] text-zinc-500">
+                            Kawasan Industri & Pergudangan, Jl. Raya Cangkringan KM 3, Sleman, D.I. Yogyakarta
+                          </p>
+                          <p className="text-[9px] text-zinc-500">
+                            Telp/WA: 0812-8147-8689 / 0812-1060-3063 | Email: mustikakayunusantara@gmail.com
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-zinc-600 space-y-0.5">
+                        <span className="inline-block px-2.5 py-0.5 bg-red-100 text-red-900 rounded font-black text-[10px] uppercase tracking-wider border border-red-200">
+                          LAPORAN RESMI
+                        </span>
+                        <p className="font-bold text-zinc-800 pt-1">Periode: {startDate} s/d {endDate}</p>
+                        <p className="text-zinc-500">Mata Uang: IDR (Rupiah)</p>
+                      </div>
+                    </div>
+
+                    {/* Judul Laporan */}
+                    <div className="text-center my-3 pb-2 border-b border-zinc-200">
+                      <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-wide uppercase">
+                        LAPORAN LABA RUGI KOMPREHENSIF
+                      </h2>
+                      <p className="text-[11px] text-zinc-500 font-medium">
+                        (INCOME STATEMENT) — PERIODE {startDate} S/D {endDate}
+                      </p>
+                    </div>
+
+                    {/* Breakdown Laba Rugi */}
+                    <div className="space-y-3.5 text-xs">
+                      {/* 1. Pendapatan */}
+                      <div>
+                        <div className="flex justify-between py-1.5 border-b border-zinc-200 font-black text-zinc-900 bg-zinc-50 px-2 rounded">
+                          <span>1. PENDAPATAN OPERASIONAL</span>
+                          <span className="font-mono">{formatRupiah(totalRevenue)}</span>
+                        </div>
+                        <div className="pl-4 pr-2 py-1 space-y-1">
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Penjualan Pallet Kayu Standar & Ekspor ISPM-15</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(totalRevenue)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-zinc-900 pt-1 border-t border-dotted border-zinc-200">
+                            <span>TOTAL PENDAPATAN OPERASIONAL</span>
+                            <span className="font-mono text-blue-700">{formatRupiah(totalRevenue)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Harga Pokok Penjualan (HPP) */}
+                      <div>
+                        <div className="flex justify-between py-1.5 border-b border-zinc-200 font-black text-zinc-900 bg-zinc-50 px-2 rounded">
+                          <span>2. HARGA POKOK PENJUALAN (HPP)</span>
+                          <span className="font-mono text-red-700">({formatRupiah(totalHPP)})</span>
+                        </div>
+                        <div className="pl-4 pr-2 py-1 space-y-1">
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Biaya Bahan Baku Kayu Log & Balok</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(hppKayu)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Biaya Paku Tembak Pallet & Aksesoris Perakitan</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(hppPaku)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Biaya Heat Treatment Oven & Sertifikasi ISPM 15</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(hppOven)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Upah Tenaga Kerja Langsung Produksi</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(hppTenagaKerja)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-zinc-900 pt-1 border-t border-dotted border-zinc-200">
+                            <span>TOTAL HARGA POKOK PENJUALAN (HPP)</span>
+                            <span className="font-mono text-red-700">({formatRupiah(totalHPP)})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Laba Kotor */}
+                      <div className="flex justify-between py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg font-black text-xs sm:text-sm text-zinc-900">
+                        <div className="flex items-center gap-2">
+                          <span>LABA KOTOR (GROSS PROFIT)</span>
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded">
+                            Margin: {totalRevenue > 0 ? ((labaKotor / totalRevenue) * 100).toFixed(1) : 0}%
+                          </span>
+                        </div>
+                        <span className="font-mono text-amber-800">{formatRupiah(labaKotor)}</span>
+                      </div>
+
+                      {/* 3. Beban Operasional */}
+                      <div>
+                        <div className="flex justify-between py-1.5 border-b border-zinc-200 font-black text-zinc-900 bg-zinc-50 px-2 rounded">
+                          <span>3. BEBAN OPERASIONAL & UMUM</span>
+                          <span className="font-mono text-red-700">({formatRupiah(totalBebanOperasional)})</span>
+                        </div>
+                        <div className="pl-4 pr-2 py-1 space-y-1">
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Gaji Staf Kantor, Sales Admin & Staff Gudang</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(bebanGajiStaff)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>BBM & Biaya Pengiriman Armada Truk Logistik</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(bebanBBM)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Listrik Industri Pabrik, Air & Pemeliharaan Pabrik</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(bebanListrikAir)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Beban Penyusutan Aset Tetap (Mesin & Chamber Oven)</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(bebanDepresiasi)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Konsumsi Karyawan, ATK & Keperluan Umum Pabrik</span>
+                            <span className="font-mono font-medium text-zinc-800">{formatRupiah(bebanKonsumsi + bebanLainnya)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-zinc-900 pt-1 border-t border-dotted border-zinc-200">
+                            <span>TOTAL BEBAN OPERASIONAL & UMUM</span>
+                            <span className="font-mono text-red-700">({formatRupiah(totalBebanOperasional)})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Laba Operasional & Pajak */}
+                      <div className="space-y-1 pt-1 border-t border-zinc-200">
+                        <div className="flex justify-between text-xs py-1 px-2 font-bold text-zinc-800">
+                          <span>4. LABA OPERASIONAL SEBELUM PAJAK (EBIT)</span>
+                          <span className="font-mono">{formatRupiah(labaOperasional)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs py-1 px-2 text-zinc-600">
+                          <span>5. ESTIMASI BEBAN PAJAK PENGHASILAN (PPH)</span>
+                          <span className="font-mono text-red-700">({formatRupiah(estimasiPajak)})</span>
+                        </div>
+                      </div>
+
+                      {/* Laba Bersih Tahun Berjalan */}
+                      <div className="flex justify-between py-2.5 px-3 bg-emerald-50 border-2 border-emerald-600 rounded-lg font-black text-sm text-emerald-900">
+                        <div className="flex items-center gap-2">
+                          <span>LABA BERSIH PERIODE BERJALAN (NET INCOME)</span>
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                            Net Margin: {totalRevenue > 0 ? ((labaBersih / totalRevenue) * 100).toFixed(1) : 0}%
+                          </span>
+                        </div>
+                        <span className="font-mono text-emerald-800">{formatRupiah(labaBersih)}</span>
+                      </div>
+                    </div>
+
+                    {/* Jika hanya cetak Laba Rugi saja: sertakan tanda tangan di bawahnya */}
+                    {printReportType === 'laba_rugi' && (
+                      <div className="grid grid-cols-2 gap-8 pt-8 mt-6 text-center border-t border-zinc-200">
+                        <div>
+                          <span className="text-[10px] text-zinc-500 block mb-12">Disiapkan Oleh,</span>
+                          <div className="border-t border-zinc-400 w-44 mx-auto pt-1 font-bold text-zinc-900 text-xs">
+                            Finance & Accounting
+                          </div>
+                          <span className="text-[9px] text-zinc-400 block">CV. Mustika Kayu Nusantara</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-zinc-500 block mb-12">Diketahui & Disetujui Oleh,</span>
+                          <div className="border-t border-zinc-400 w-44 mx-auto pt-1 font-bold text-zinc-900 text-xs">
+                            Direktur Operasional / Utama
+                          </div>
+                          <span className="text-[9px] text-zinc-400 block">CV. Mustika Kayu Nusantara</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer Sheet 1 */}
+                    <div className="mt-6 pt-3 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-400">
+                      <span>Dokumen Resmi Sistem ERP — CV. Mustika Kayu Nusantara</span>
+                      <span>{printReportType === 'gabungan' ? 'Halaman 1 dari 2 (Laba Rugi)' : 'Halaman 1 dari 1'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ===== SHEET 2: NERACA (Tampil saat 'gabungan' atau 'neraca') ===== */}
+                {(printReportType === 'gabungan' || printReportType === 'neraca') && (
+                  <div className="pdf-page-sheet printable-sheet bg-white text-zinc-900 p-8 sm:p-10 rounded-xl shadow-lg w-full text-xs font-sans border border-zinc-300 mb-6">
+                    {/* Kop Surat Resmi CV. Mustika Kayu Nusantara */}
+                    <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3.5">
+                        <CompanyLogo className="w-12 h-12 flex-shrink-0" />
+                        <div>
+                          <h1 className="font-extrabold text-base tracking-tight text-[#2E7D32]">
+                            CV. MUSTIKA KAYU NUSANTARA
+                          </h1>
+                          <p className="text-[10px] text-zinc-600 font-medium">
+                            Supplier Kayu Olahan, Aneka Industri Kayu, Pallet Kayu Standar & Ekspor ISPM-15
+                          </p>
+                          <p className="text-[9px] text-zinc-500">
+                            Kawasan Industri & Pergudangan, Jl. Raya Cangkringan KM 3, Sleman, D.I. Yogyakarta
+                          </p>
+                          <p className="text-[9px] text-zinc-500">
+                            Telp/WA: 0812-8147-8689 / 0812-1060-3063 | Email: mustikakayunusantara@gmail.com
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-zinc-600 space-y-0.5">
+                        <span className="inline-block px-2.5 py-0.5 bg-red-100 text-red-900 rounded font-black text-[10px] uppercase tracking-wider border border-red-200">
+                          LAPORAN RESMI
+                        </span>
+                        <p className="font-bold text-zinc-800 pt-1">Posisi Per: {endDate || 'Hari Ini'}</p>
+                        <p className="text-zinc-500">Mata Uang: IDR (Rupiah)</p>
+                      </div>
+                    </div>
+
+                    {/* Judul Laporan */}
+                    <div className="text-center my-3 pb-2 border-b border-zinc-200">
+                      <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-wide uppercase">
+                        LAPORAN POSISI KEUANGAN (NERACA)
+                      </h2>
+                      <p className="text-[11px] text-zinc-500 font-medium">
+                        (BALANCE SHEET) — POSISI PER {endDate || 'HARI INI'}
+                      </p>
+                    </div>
+
+                    {/* 2 Kolom Berdampingan: AKTIVA vs PASIVA */}
+                    <div className="grid grid-cols-2 gap-6 my-4">
+                      {/* Sisi Kiri: AKTIVA (ASET) */}
+                      <div className="border border-zinc-200 rounded-lg p-3 space-y-3 bg-zinc-50/50">
+                        <div className="border-b-2 border-red-800 pb-1 flex justify-between items-center">
+                          <span className="font-black text-red-900 text-xs uppercase tracking-wide">AKTIVA (ASET)</span>
+                          <span className="text-[10px] font-bold text-zinc-500">Debit</span>
+                        </div>
+
+                        {/* Aset Lancar */}
+                        <div>
+                          <span className="font-bold text-zinc-800 block text-[11px] mb-1">A. Aset Lancar:</span>
+                          <div className="space-y-1 pl-2 text-[11px]">
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Kas Kecil & Kasir Pabrik</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(kasKecil)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Kas Bank Mandiri (156-00-1909954-0)</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(kasBank)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Piutang Usaha Pelanggan (AR)</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(piutangUsaha)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Persediaan Bahan Baku Kayu</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(nilaiStokMaterial)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Persediaan Pallet Jadi (Finish Goods)</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(nilaiStokFinishGoods)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold bg-zinc-100 p-1 rounded text-zinc-900 border-t border-zinc-200">
+                              <span>Subtotal Aset Lancar</span>
+                              <span className="font-mono text-blue-700">{formatRupiah(totalAsetLancar)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Aset Tetap */}
+                        <div>
+                          <span className="font-bold text-zinc-800 block text-[11px] mb-1">B. Aset Tetap:</span>
+                          <div className="space-y-1 pl-2 text-[11px]">
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Nilai Perolehan Mesin & Bangunan</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(totalHargaPerolehanAset)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Akumulasi Penyusutan Aset (-)</span>
+                              <span className="font-mono font-medium text-red-600">({formatRupiah(totalAkumulasiPenyusutan)})</span>
+                            </div>
+                            <div className="flex justify-between font-bold bg-zinc-100 p-1 rounded text-zinc-900 border-t border-zinc-200">
+                              <span>Nilai Buku Bersih Aset Tetap</span>
+                              <span className="font-mono text-blue-700">{formatRupiah(totalNilaiBukuAset)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* TOTAL ASET */}
+                        <div className="p-2 bg-red-900 text-white rounded-lg flex justify-between font-black text-xs">
+                          <span>TOTAL AKTIVA (ASET)</span>
+                          <span className="font-mono">{formatRupiah(grandTotalAset)}</span>
+                        </div>
+                      </div>
+
+                      {/* Sisi Kanan: PASIVA (LIABILITAS & EKUITAS) */}
+                      <div className="border border-zinc-200 rounded-lg p-3 space-y-3 bg-zinc-50/50">
+                        <div className="border-b-2 border-red-800 pb-1 flex justify-between items-center">
+                          <span className="font-black text-red-900 text-xs uppercase tracking-wide">PASIVA (KEWAJIBAN & EKUITAS)</span>
+                          <span className="text-[10px] font-bold text-zinc-500">Kredit</span>
+                        </div>
+
+                        {/* Kewajiban / Liabilitas */}
+                        <div>
+                          <span className="font-bold text-zinc-800 block text-[11px] mb-1">A. Kewajiban (Liabilitas):</span>
+                          <div className="space-y-1 pl-2 text-[11px]">
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Hutang Usaha Supplier Kayu (AP)</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(hutangUsahaSupplier)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Hutang Pajak & Biaya Berjalan</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(hutangBiayaPajak)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold bg-zinc-100 p-1 rounded text-zinc-900 border-t border-zinc-200">
+                              <span>Subtotal Kewajiban (Liabilitas)</span>
+                              <span className="font-mono text-amber-700">{formatRupiah(totalLiabilitas)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ekuitas Pemilik */}
+                        <div>
+                          <span className="font-bold text-zinc-800 block text-[11px] mb-1">B. Modal & Ekuitas Pemilik:</span>
+                          <div className="space-y-1 pl-2 text-[11px]">
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Modal Disetor Pendiri</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(modalDisetor)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Laba Ditahan (Tahun Sebelumnya)</span>
+                              <span className="font-mono font-medium text-zinc-900">{formatRupiah(labaDitahan)}</span>
+                            </div>
+                            <div className="flex justify-between text-zinc-600">
+                              <span>Laba Bersih Tahun Berjalan</span>
+                              <span className="font-mono font-bold text-emerald-700">{formatRupiah(labaBersih)}</span>
+                            </div>
+                            {penyeimbangNeraca !== 0 && (
+                              <div className="flex justify-between text-zinc-500 italic text-[10px]">
+                                <span>Selisih Penyeimbang Neraca</span>
+                                <span className="font-mono">{formatRupiah(penyeimbangNeraca)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-bold bg-zinc-100 p-1 rounded text-zinc-900 border-t border-zinc-200">
+                              <span>Subtotal Ekuitas Pemilik</span>
+                              <span className="font-mono text-emerald-700">{formatRupiah(totalEkuitas)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* TOTAL PASIVA */}
+                        <div className="p-2 bg-red-900 text-white rounded-lg flex justify-between font-black text-xs">
+                          <span>TOTAL LIABILITAS & EKUITAS</span>
+                          <span className="font-mono">{formatRupiah(grandTotalLiabilitasEkuitas)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Validasi Keseimbangan Neraca */}
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center justify-between text-emerald-900 text-xs font-bold my-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-emerald-700" />
+                        <span>STATUS NERACA: SEIMBANG (BALANCED)</span>
+                      </div>
+                      <span className="font-mono">Total Aktiva = Total Pasiva ({formatRupiah(grandTotalAset)})</span>
+                    </div>
+
+                    {/* Pengesahan Tanda Tangan Resmi */}
+                    <div className="grid grid-cols-2 gap-8 pt-6 mt-4 text-center border-t border-zinc-200">
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block mb-12">Disiapkan Oleh,</span>
+                        <div className="border-t border-zinc-400 w-44 mx-auto pt-1 font-bold text-zinc-900 text-xs">
+                          Finance & Accounting
+                        </div>
+                        <span className="text-[9px] text-zinc-400 block">CV. Mustika Kayu Nusantara</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block mb-12">Diketahui & Disetujui Oleh,</span>
+                        <div className="border-t border-zinc-400 w-44 mx-auto pt-1 font-bold text-zinc-900 text-xs">
+                          Direktur Operasional / Utama
+                        </div>
+                        <span className="text-[9px] text-zinc-400 block">CV. Mustika Kayu Nusantara</span>
+                      </div>
+                    </div>
+
+                    {/* Footer Sheet 2 */}
+                    <div className="mt-6 pt-3 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-400">
+                      <span>Dokumen Resmi Sistem ERP — CV. Mustika Kayu Nusantara</span>
+                      <span>{printReportType === 'gabungan' ? 'Halaman 2 dari 2 (Neraca Posisi Keuangan)' : 'Halaman 1 dari 1'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ===== SHEET 3: ARUS KAS (Tampil saat 'arus_kas') ===== */}
+                {printReportType === 'arus_kas' && (
+                  <div className="pdf-page-sheet printable-sheet bg-white text-zinc-900 p-8 sm:p-10 rounded-xl shadow-lg w-full text-xs font-sans border border-zinc-300 mb-6">
+                    {/* Kop Surat Resmi CV. Mustika Kayu Nusantara */}
+                    <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3.5">
+                        <CompanyLogo className="w-12 h-12 flex-shrink-0" />
+                        <div>
+                          <h1 className="font-extrabold text-base tracking-tight text-[#2E7D32]">
+                            CV. MUSTIKA KAYU NUSANTARA
+                          </h1>
+                          <p className="text-[10px] text-zinc-600 font-medium">
+                            Supplier Kayu Olahan, Aneka Industri Kayu, Pallet Kayu Standar & Ekspor ISPM-15
+                          </p>
+                          <p className="text-[9px] text-zinc-500">
+                            Kawasan Industri & Pergudangan, Jl. Raya Cangkringan KM 3, Sleman, D.I. Yogyakarta
+                          </p>
+                          <p className="text-[9px] text-zinc-500">
+                            Telp/WA: 0812-8147-8689 / 0812-1060-3063 | Email: mustikakayunusantara@gmail.com
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-zinc-600 space-y-0.5">
+                        <span className="inline-block px-2.5 py-0.5 bg-red-100 text-red-900 rounded font-black text-[10px] uppercase tracking-wider border border-red-200">
+                          LAPORAN RESMI
+                        </span>
+                        <p className="font-bold text-zinc-800 pt-1">Periode: {startDate} s/d {endDate}</p>
+                        <p className="text-zinc-500">Mata Uang: IDR (Rupiah)</p>
+                      </div>
+                    </div>
+
+                    {/* Judul Laporan */}
+                    <div className="text-center my-3 pb-2 border-b border-zinc-200">
+                      <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-wide uppercase">
+                        LAPORAN ARUS KAS (METODE LANGSUNG)
+                      </h2>
+                      <p className="text-[11px] text-zinc-500 font-medium">
+                        (STATEMENT OF CASH FLOWS) — PERIODE {startDate} S/D {endDate}
+                      </p>
+                    </div>
+
+                    {/* Rincian Arus Kas */}
+                    <div className="space-y-4 my-4">
+                      <div>
+                        <div className="font-black text-xs text-zinc-900 bg-zinc-100 p-1.5 rounded mb-2">
+                          1. ARUS KAS DARI AKTIVITAS OPERASIONAL
+                        </div>
+                        <div className="space-y-1.5 pl-3">
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Penerimaan Kas dari Pelanggan & Piutang Penjualan Pallet</span>
+                            <span className="font-mono text-emerald-700 font-bold">+{formatRupiah(cashFlowDetails.penerimaanPelanggan)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Pembayaran Kas ke Supplier Kayu Log, Paku & Perlengkapan</span>
+                            <span className="font-mono text-red-700">-{formatRupiah(cashFlowDetails.pembayaranSupplier)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Pembayaran Upah Tenaga Kerja Produksi & Gaji Karyawan Pabrik</span>
+                            <span className="font-mono text-red-700">-{formatRupiah(cashFlowDetails.pembayaranGaji)}</span>
+                          </div>
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Pembayaran Biaya Listrik, BBM Truk & Operasional Umum</span>
+                            <span className="font-mono text-red-700">-{formatRupiah(cashFlowDetails.pembayaranOperasional)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold bg-zinc-50 p-1.5 rounded border-t border-zinc-200">
+                            <span>Arus Kas Bersih dari Aktivitas Operasional</span>
+                            <span className={`font-mono ${cashFlowDetails.kasBersihOperasi >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                              {cashFlowDetails.kasBersihOperasi >= 0 ? '+' : ''}{formatRupiah(cashFlowDetails.kasBersihOperasi)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="font-black text-xs text-zinc-900 bg-zinc-100 p-1.5 rounded mb-2">
+                          2. ARUS KAS DARI AKTIVITAS INVESTASI
+                        </div>
+                        <div className="space-y-1.5 pl-3">
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Pembelian / Upgrade Mesin Produksi & Fasilitas Chamber Oven</span>
+                            <span className="font-mono text-red-700">-{formatRupiah(cashFlowDetails.pembelianAset)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold bg-zinc-50 p-1.5 rounded border-t border-zinc-200">
+                            <span>Arus Kas Bersih dari Aktivitas Investasi</span>
+                            <span className="font-mono text-red-700">-{formatRupiah(cashFlowDetails.pembelianAset)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="font-black text-xs text-zinc-900 bg-zinc-100 p-1.5 rounded mb-2">
+                          3. ARUS KAS DARI AKTIVITAS PENDANAAN
+                        </div>
+                        <div className="space-y-1.5 pl-3">
+                          <div className="flex justify-between text-zinc-600">
+                            <span>Penerimaan Setoran Modal Pendiri / Investor</span>
+                            <span className="font-mono text-emerald-700 font-bold">+{formatRupiah(cashFlowDetails.penerimaanModal)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold bg-zinc-50 p-1.5 rounded border-t border-zinc-200">
+                            <span>Arus Kas Bersih dari Aktivitas Pendanaan</span>
+                            <span className="font-mono text-emerald-700 font-bold">+{formatRupiah(cashFlowDetails.penerimaanModal)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ringkasan Kas Akhir */}
+                      <div className="p-3 bg-zinc-100 rounded-lg space-y-1.5 border border-zinc-200">
+                        <div className="flex justify-between font-black text-xs text-zinc-900">
+                          <span>KENAIKAN / (PENURUNAN) BERSIH KAS & SETARA KAS</span>
+                          <span className={`font-mono text-sm ${cashFlowDetails.perubahanKasBersih >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                            {cashFlowDetails.perubahanKasBersih >= 0 ? '+' : ''}{formatRupiah(cashFlowDetails.perubahanKasBersih)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600 border-t border-zinc-200 pt-1">
+                          <span>Saldo Kas Awal Periode (Kas Kecil + Bank Mandiri)</span>
+                          <span className="font-mono font-medium">{formatRupiah(cashFlowDetails.totalAwal)}</span>
+                        </div>
+                        <div className="flex justify-between font-black text-zinc-900 border-t border-zinc-300 pt-1">
+                          <span>Saldo Kas Akhir Periode (Sesuai Neraca)</span>
+                          <span className="font-mono text-blue-800">{formatRupiah(cashFlowDetails.totalAkhir)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pengesahan Tanda Tangan */}
+                    <div className="grid grid-cols-2 gap-8 pt-6 mt-4 text-center border-t border-zinc-200">
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block mb-12">Disiapkan Oleh,</span>
+                        <div className="border-t border-zinc-400 w-44 mx-auto pt-1 font-bold text-zinc-900 text-xs">
+                          Finance & Accounting
+                        </div>
+                        <span className="text-[9px] text-zinc-400 block">CV. Mustika Kayu Nusantara</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block mb-12">Diketahui & Disetujui Oleh,</span>
+                        <div className="border-t border-zinc-400 w-44 mx-auto pt-1 font-bold text-zinc-900 text-xs">
+                          Direktur Operasional / Utama
+                        </div>
+                        <span className="text-[9px] text-zinc-400 block">CV. Mustika Kayu Nusantara</span>
+                      </div>
+                    </div>
+
+                    {/* Footer Sheet 3 */}
+                    <div className="mt-6 pt-3 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-400">
+                      <span>Dokumen Resmi Sistem ERP — CV. Mustika Kayu Nusantara</span>
+                      <span>Halaman 1 dari 1 (Arus Kas)</span>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+
           </div>
         </div>
       )}

@@ -73,22 +73,6 @@ export async function downloadElementAsPdf(elementId: string, fileName: string):
     const prevCursor = document.body.style.cursor;
     document.body.style.cursor = 'wait';
 
-    // Capture the element using html2canvas-pro with high resolution and correct dimensions
-    const canvas = await html2canvas(element, {
-      scale: 2, // 2x resolution for crystal sharp text and lines
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: element.scrollWidth > 800 ? element.scrollWidth : 1000,
-    });
-
-    document.body.style.cursor = prevCursor;
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    
     // A4 dimensions in mm: 210 x 297
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -101,24 +85,77 @@ export async function downloadElementAsPdf(elementId: string, fileName: string):
     const pageHeight = 297;
     const margin = 8; // 8mm clean margin
     const contentWidth = pageWidth - (margin * 2); // 194mm
-    
-    const imgWidth = contentWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const maxContentHeight = pageHeight - (margin * 2); // 281mm
 
-    let heightLeft = imgHeight;
-    let position = margin;
+    // Check if element contains structured multi-page sheets
+    const pageSheets = Array.from(element.querySelectorAll<HTMLElement>('.pdf-page-sheet'));
 
-    // First page
-    pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
-    heightLeft -= (pageHeight - (margin * 2));
+    if (pageSheets.length > 0) {
+      for (let i = 0; i < pageSheets.length; i++) {
+        const sheet = pageSheets[i];
+        if (i > 0) {
+          pdf.addPage();
+        }
 
-    // Subsequent pages if document height exceeds single A4 page
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight + margin;
-      pdf.addPage();
+        const pageCanvas = await html2canvas(sheet, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: sheet.scrollWidth > 800 ? sheet.scrollWidth : 1000,
+        });
+
+        const imgData = pageCanvas.toDataURL('image/jpeg', 0.95);
+        let finalWidth = contentWidth;
+        let finalHeight = (pageCanvas.height * finalWidth) / pageCanvas.width;
+
+        // Proportionally scale to fit cleanly on A4 without truncation if slightly tall
+        if (finalHeight > maxContentHeight) {
+          const scaleRatio = maxContentHeight / finalHeight;
+          finalWidth *= scaleRatio;
+          finalHeight = maxContentHeight;
+        }
+
+        const leftPos = margin + ((contentWidth - finalWidth) / 2);
+        pdf.addImage(imgData, 'JPEG', leftPos, margin, finalWidth, finalHeight);
+      }
+    } else {
+      // Capture single continuous element
+      const canvas = await html2canvas(element, {
+        scale: 2, // 2x resolution for crystal sharp text and lines
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: element.scrollWidth > 800 ? element.scrollWidth : 1000,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgWidth = contentWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      // First page
       pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - (margin * 2));
+      heightLeft -= maxContentHeight;
+
+      // Subsequent pages if document height exceeds single A4 page
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+        heightLeft -= maxContentHeight;
+      }
     }
+
+    document.body.style.cursor = prevCursor;
 
     const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
     
@@ -184,10 +221,12 @@ export async function triggerPrintOrPdf(elementId: string, fallbackFileName: str
             ${headHtml}
             <style>
               @media print {
-                @page { size: A4 portrait; margin: 10mm; }
+                @page { size: A4 portrait; margin: 8mm; }
                 body { margin: 0; background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 .print-toolbar { display: none !important; }
                 .printable-sheet { padding: 0 !important; border: none !important; width: 100% !important; max-width: none !important; box-shadow: none !important; }
+                .pdf-page-sheet { page-break-after: always; break-after: page; margin-bottom: 0 !important; box-shadow: none !important; border: none !important; width: 100% !important; }
+                .pdf-page-sheet:last-child { page-break-after: avoid; break-after: avoid; }
               }
               body {
                 background: #f4f4f5;

@@ -160,10 +160,12 @@ export interface POSupplierItem {
   namaMaterial: string;
   ukuran?: string;
   kategori?: string;
-  jumlah: number;
+  jumlah: number; // Qty Dipesan di PO
+  jumlahDiterima?: number; // Qty yang benar-benar diterima fisik di gudang
   satuan: string;
   hargaSatuan: number;
   subtotal: number;
+  subtotalDiterima?: number; // Nilai subtotal barang yang sudah diterima fisik
 }
 
 export interface PurchaseOrderSupplier {
@@ -186,7 +188,11 @@ export interface PurchaseOrderSupplier {
   pphNominal?: number;
   biayaKirim?: number;
   totalHarga: number;
-  statusPO: 'Draf' | 'Disetujui' | 'Dikirim Supplier' | 'Diterima Gudang' | 'Selesai' | 'Dibatalkan';
+  totalNilaiDiterima?: number; // Total nilai riil barang yang diterima di gudang (dasar AP riil)
+  tanggalDiterima?: string;
+  penerimaGudang?: string;
+  catatanPenerimaan?: string;
+  statusPO: 'Draf' | 'Disetujui' | 'Dikirim Supplier' | 'Diterima Sebagian' | 'Diterima Gudang' | 'Selesai' | 'Dibatalkan';
   statusAP: 'Belum Lunas' | 'Sebagian' | 'Lunas';
   apId?: string; // Link ID to HutangUsaha (Laporan AP)
   nomorTagihanAP?: string; // e.g. AP-PO-SUP/2026/09/001
@@ -203,6 +209,20 @@ export interface Customer {
   email?: string;
   pic?: string;
   syaratPembayaran?: SyaratPembayaran; // Default TOP customer: COD, CBD, Tempo 7 Hari, Tempo 14 Hari, Tempo 30 Hari
+  createdAt: string;
+}
+
+export interface Supplier {
+  id: string;
+  nama: string;
+  alamat?: string;
+  telepon?: string;
+  email?: string;
+  pic?: string;
+  kategoriDefault?: 'Bahan Baku Kayu' | 'Paku & Besi' | 'Sewa / Perbaikan Mesin' | 'Solar & Bahan Bakar' | 'Lainnya' | string;
+  syaratPembayaranDefault?: SyaratPembayaran;
+  bankInfo?: string; // Rekening / Info Pembayaran Vendor
+  catatan?: string;
   createdAt: string;
 }
 
@@ -257,7 +277,7 @@ export interface HutangUsaha {
   totalTagihan: number;
   sudahDibayar: number;
   sisaHutang: number;
-  status: 'Belum Lunas' | 'Lunas' | 'Jatuh Tempo';
+  status: 'Belum Lunas' | 'Lunas' | 'Sebagian' | 'Jatuh Tempo';
   riwayatBayar?: {
     tanggal: string;
     nominal: number;
