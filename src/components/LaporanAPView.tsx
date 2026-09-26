@@ -281,9 +281,19 @@ export const LaporanAPView: React.FC = () => {
                   <tr key={item.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
                     <td className="p-3.5">
                       <span className="font-bold text-zinc-900 dark:text-white block">{item.supplier}</span>
-                      <span className="text-[11px] text-zinc-400">{item.kategori} - {item.keterangan}</span>
+                      <span className="text-[11px] text-zinc-400 block">{item.kategori} - {item.keterangan}</span>
+                      {item.nomorPO && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-[10px] font-bold border border-red-200 dark:border-red-900/60">
+                          PO Supplier: {item.nomorPO}
+                        </span>
+                      )}
                     </td>
-                    <td className="p-3.5 font-semibold text-zinc-700 dark:text-zinc-300">{item.nomorTagihan}</td>
+                    <td className="p-3.5">
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300 block">{item.nomorTagihan}</span>
+                      {item.poSupplierId && !item.nomorPO && (
+                        <span className="text-[10px] text-red-600 dark:text-red-400 font-medium">Dari PO Supplier</span>
+                      )}
+                    </td>
                     <td className="p-3.5 text-zinc-600 dark:text-zinc-400">{item.tanggal}</td>
                     <td className="p-3.5 text-zinc-600 dark:text-zinc-400 font-medium">{item.tanggalJatuhTempo}</td>
                     <td className="p-3.5 text-right font-bold text-zinc-800 dark:text-zinc-200">{formatRupiah(item.totalTagihan)}</td>

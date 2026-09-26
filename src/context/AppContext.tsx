@@ -16,7 +16,9 @@ import {
   PajakItem,
   TandaTerimaPengambilanMaterial,
   MaterialMutasiItem,
-  FinishGoodMutasiItem
+  FinishGoodMutasiItem,
+  PurchaseOrderSupplier,
+  POSupplierItem
 } from '../types';
 import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
 import { calculateDueDateFromInvoice } from '../utils/paymentTerms';
@@ -25,6 +27,7 @@ interface AppContextProps {
   materials: Material[];
   finishGoods: FinishGood[];
   purchaseOrders: PurchaseOrder[];
+  poSuppliers: PurchaseOrderSupplier[];
   suratJalanList: SuratJalan[];
   keuanganList: Keuangan[];
   customers: Customer[];
@@ -112,6 +115,13 @@ interface AppContextProps {
   updatePOStatus: (id: string, status: PurchaseOrder['statusPO']) => void;
   updateInvoiceStatus: (id: string, status: PurchaseOrder['statusInvoice'], paymentMethod?: Keuangan['metodePembayaran']) => void;
 
+  // Purchase Order ke Supplier actions
+  addPOSupplier: (po: Omit<PurchaseOrderSupplier, 'id' | 'createdAt' | 'statusAP' | 'apId' | 'nomorTagihanAP'>) => string;
+  updatePOSupplier: (id: string, po: Partial<PurchaseOrderSupplier>) => void;
+  deletePOSupplier: (id: string) => void;
+  updatePOSupplierStatus: (id: string, status: PurchaseOrderSupplier['statusPO']) => void;
+  terimaBarangPOSupplier: (id: string, keterangan?: string) => { success: boolean; message: string };
+
   // Customer actions
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => void;
   updateCustomer: (id: string, customer: Partial<Customer>) => void;
@@ -182,6 +192,147 @@ export const DEFAULT_PASSWORDS: Record<UserRole, string> = {
   OWNER: 'owner123'
 };
 
+export const DEFAULT_PO_SUPPLIERS: PurchaseOrderSupplier[] = [
+  {
+    id: 'posup-1',
+    nomorPO: 'PO-SUP/2026/08/001',
+    nomorRefSupplier: 'SPH-088/SKL/26',
+    supplier: 'PT Sumber Kayu Lestari',
+    alamatSupplier: 'Jl. Raya Magelang KM 14, Sleman, DI Yogyakarta',
+    teleponSupplier: '0812-3456-7890',
+    picSupplier: 'Bpk. H. Sudirman',
+    tanggal: '2026-08-10',
+    tanggalPengiriman: '2026-08-15',
+    syaratPembayaran: 'Tempo 30 Hari',
+    tanggalJatuhTempo: '2026-09-09',
+    kategori: 'Bahan Baku Kayu',
+    items: [
+      { namaMaterial: 'Kayu Log Albasia Sengon Dia 25cm', kodeMaterial: 'MAT-001', ukuran: 'Dia 25-30 cm, P 200 cm', jumlah: 20, satuan: 'm3', hargaSatuan: 950000, subtotal: 19000000 },
+      { namaMaterial: 'Balok Kayu Mahoni 6x12x200', kodeMaterial: 'MAT-002', ukuran: '6 x 12 x 200 cm', jumlah: 15, satuan: 'm3', hargaSatuan: 1450000, subtotal: 21750000 }
+    ],
+    subtotal: 40750000,
+    tipePajak: 'PPN 11%',
+    ppnNominal: 4482500,
+    biayaKirim: 0,
+    totalHarga: 45232500,
+    statusPO: 'Diterima Gudang',
+    statusAP: 'Belum Lunas',
+    apId: 'ap-po-posup-1',
+    nomorTagihanAP: 'AP-PO-SUP/2026/08/001',
+    catatan: 'Kayu log grade super tanpa mata mati busuk',
+    dibuatOleh: 'Sales Admin',
+    createdAt: '2026-08-10T08:00:00Z'
+  },
+  {
+    id: 'posup-2',
+    nomorPO: 'PO-SUP/2026/08/020',
+    nomorRefSupplier: 'NOTA-991/LMA',
+    supplier: 'CV Log Makmur Abadi',
+    alamatSupplier: 'Kutoarjo, Purworejo, Jawa Tengah',
+    teleponSupplier: '0857-8910-1122',
+    picSupplier: 'Ibu Ratna Susanti',
+    tanggal: '2026-08-18',
+    tanggalPengiriman: '2026-08-22',
+    syaratPembayaran: 'Tempo 14 Hari',
+    tanggalJatuhTempo: '2026-09-01',
+    kategori: 'Bahan Baku Kayu',
+    items: [
+      { namaMaterial: 'Kayu Papan Mahoni 2x10x120', kodeMaterial: 'MAT-003', ukuran: '2 x 10 x 120 cm', jumlah: 300, satuan: 'lembar', hargaSatuan: 22000, subtotal: 6600000 },
+      { namaMaterial: 'Papan Albasia Standard', kodeMaterial: 'MAT-004', ukuran: '2 x 9 x 100 cm', jumlah: 400, satuan: 'lembar', hargaSatuan: 16500, subtotal: 6600000 }
+    ],
+    subtotal: 13200000,
+    tipePajak: 'Non PPN',
+    totalHarga: 13200000,
+    statusPO: 'Diterima Gudang',
+    statusAP: 'Lunas',
+    apId: 'ap-po-posup-2',
+    nomorTagihanAP: 'AP-PO-SUP/2026/08/020',
+    catatan: 'Pengiriman armada truk colt diesel CV Log Makmur',
+    dibuatOleh: 'Sales Admin',
+    createdAt: '2026-08-18T09:30:00Z'
+  },
+  {
+    id: 'posup-3',
+    nomorPO: 'PO-SUP/2026/09/005',
+    nomorRefSupplier: 'SP-109/BPN/IX',
+    supplier: 'PT Baja Paku Nusantara',
+    alamatSupplier: 'Kawasan Industri Candi Blok 8, Semarang',
+    teleponSupplier: '024-7612345',
+    picSupplier: 'Sales Bpk Eko Wibowo',
+    tanggal: '2026-09-12',
+    tanggalPengiriman: '2026-09-18',
+    syaratPembayaran: 'Tempo 30 Hari',
+    tanggalJatuhTempo: '2026-10-12',
+    kategori: 'Paku & Besi',
+    items: [
+      { namaMaterial: 'Paku Koil Coil Nails 2.1 x 45mm Pallet', kodeMaterial: 'MAT-007', ukuran: '2.1 x 45 mm', jumlah: 15, satuan: 'dus', hargaSatuan: 450000, subtotal: 6750000 },
+      { namaMaterial: 'Paku Ulir Ring Shank 2.5 x 50mm', kodeMaterial: 'MAT-008', ukuran: '2.5 x 50 mm', jumlah: 10, satuan: 'dus', hargaSatuan: 520000, subtotal: 5200000 }
+    ],
+    subtotal: 11950000,
+    tipePajak: 'PPN 11%',
+    ppnNominal: 1314500,
+    totalHarga: 13264500,
+    statusPO: 'Dikirim Supplier',
+    statusAP: 'Belum Lunas',
+    apId: 'ap-po-posup-3',
+    nomorTagihanAP: 'AP-PO-SUP/2026/09/005',
+    catatan: 'Paku anti karat bersertifikasi untuk perakitan pallet ekspor',
+    dibuatOleh: 'Sales Admin',
+    createdAt: '2026-09-12T10:15:00Z'
+  }
+];
+
+export const DEFAULT_HUTANG_FROM_POS: HutangUsaha[] = [
+  {
+    id: 'ap-po-posup-1',
+    nomorTagihan: 'AP-PO-SUP/2026/08/001',
+    supplier: 'PT Sumber Kayu Lestari',
+    tanggal: '2026-08-10',
+    tanggalJatuhTempo: '2026-09-09',
+    kategori: 'Bahan Baku Kayu',
+    keterangan: 'PO Supplier PO-SUP/2026/08/001: Kayu Log Albasia Sengon & Balok Mahoni',
+    totalTagihan: 45232500,
+    sudahDibayar: 0,
+    sisaHutang: 45232500,
+    status: 'Belum Lunas',
+    poSupplierId: 'posup-1',
+    nomorPO: 'PO-SUP/2026/08/001'
+  },
+  {
+    id: 'ap-po-posup-2',
+    nomorTagihan: 'AP-PO-SUP/2026/08/020',
+    supplier: 'CV Log Makmur Abadi',
+    tanggal: '2026-08-18',
+    tanggalJatuhTempo: '2026-09-01',
+    kategori: 'Bahan Baku Kayu',
+    keterangan: 'PO Supplier PO-SUP/2026/08/020: Kayu Papan Mahoni & Papan Albasia',
+    totalTagihan: 13200000,
+    sudahDibayar: 13200000,
+    sisaHutang: 0,
+    status: 'Lunas',
+    poSupplierId: 'posup-2',
+    nomorPO: 'PO-SUP/2026/08/020',
+    riwayatBayar: [
+      { tanggal: '2026-08-28', nominal: 13200000, metode: 'Transfer Bank Mandiri', catatan: 'Pelunasan faktur PO-SUP/2026/08/020' }
+    ]
+  },
+  {
+    id: 'ap-po-posup-3',
+    nomorTagihan: 'AP-PO-SUP/2026/09/005',
+    supplier: 'PT Baja Paku Nusantara',
+    tanggal: '2026-09-12',
+    tanggalJatuhTempo: '2026-10-12',
+    kategori: 'Paku & Besi',
+    keterangan: 'PO Supplier PO-SUP/2026/09/005: Paku Koil Coil Nails & Paku Ulir Ring Shank',
+    totalTagihan: 13264500,
+    sudahDibayar: 0,
+    sisaHutang: 13264500,
+    status: 'Belum Lunas',
+    poSupplierId: 'posup-3',
+    nomorPO: 'PO-SUP/2026/09/005'
+  }
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Master tombstone registry for all deleted IDs (prevents stale onSnapshot or offline cache re-hydration)
   const initialDeletedDocs: string[] = (() => {
@@ -247,6 +398,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   });
 
+  const [poSuppliers, setPOSuppliers] = useState<PurchaseOrderSupplier[]>(() => {
+    const cached = localStorage.getItem('mk_po_suppliers');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as PurchaseOrderSupplier[];
+        return parsed.filter(p => !deletedDocIdsRef.current.has(p.id));
+      } catch { return DEFAULT_PO_SUPPLIERS; }
+    }
+    return DEFAULT_PO_SUPPLIERS;
+  });
+
   const [suratJalanList, setSuratJalanList] = useState<SuratJalan[]>(() => {
     const cached = localStorage.getItem('mk_surat_jalan');
     if (cached) {
@@ -295,11 +457,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cached = localStorage.getItem('mk_hutang_ap');
     if (cached) {
       try {
-        const parsed = JSON.parse(cached) as HutangUsaha[];
-        return parsed.filter(h => !deletedDocIdsRef.current.has(h.id));
-      } catch { return []; }
+        const parsed = (JSON.parse(cached) as HutangUsaha[]).filter(h => !deletedDocIdsRef.current.has(h.id));
+        // Ensure initial sample PO AP records exist if not deleted
+        const existingIds = new Set(parsed.map(h => h.id));
+        const missingDefaults = DEFAULT_HUTANG_FROM_POS.filter(d => !existingIds.has(d.id) && !deletedDocIdsRef.current.has(d.id));
+        if (missingDefaults.length > 0) {
+          const merged = [...parsed, ...missingDefaults];
+          localStorage.setItem('mk_hutang_ap', JSON.stringify(merged));
+          return merged;
+        }
+        return parsed;
+      } catch { return DEFAULT_HUTANG_FROM_POS; }
     }
-    return [];
+    return DEFAULT_HUTANG_FROM_POS;
   });
 
   const [kasKecilList, setKasKecilList] = useState<KasKecilItem[]>(() => {
@@ -589,6 +759,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Firestore purchase_orders sync fallback:', err);
       });
 
+      const unsubPOSuppliers = onSnapshot(collection(db, 'po_suppliers'), (snap) => {
+        const list = snap.docs
+          .filter(d => !deletedDocIdsRef.current.has(d.id))
+          .map(d => ({ ...d.data(), id: d.id } as PurchaseOrderSupplier));
+        setPOSuppliers(list);
+        localStorage.setItem('mk_po_suppliers', JSON.stringify(list));
+        setIsFirebaseConnected(true);
+        setSyncStatus('synced');
+      }, (err) => {
+        console.warn('Firestore po_suppliers sync fallback:', err);
+      });
+
       const unsubSJ = onSnapshot(collection(db, 'surat_jalan'), (snap) => {
         const list = snap.docs
           .filter(d => !deletedDocIdsRef.current.has(d.id))
@@ -833,6 +1015,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubMaterials();
         unsubFinishGoods();
         unsubPOs();
+        unsubPOSuppliers();
         unsubSJ();
         unsubKeuangan();
         unsubCustomers();
@@ -873,6 +1056,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const savePurchaseOrders = (newPOs: PurchaseOrder[]) => {
     setPurchaseOrders(newPOs);
     localStorage.setItem('mk_purchase_orders', JSON.stringify(newPOs));
+  };
+
+  const savePOSuppliers = (newPOSup: PurchaseOrderSupplier[]) => {
+    setPOSuppliers(newPOSup);
+    localStorage.setItem('mk_po_suppliers', JSON.stringify(newPOSup));
   };
 
   const saveSuratJalan = (newSJ: SuratJalan[]) => {
@@ -1690,6 +1878,165 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // --- CRUD Purchase Order Supplier (Pengadaan Bahan Baku ke Supplier) ---
+  const addPOSupplier = (poData: Omit<PurchaseOrderSupplier, 'id' | 'createdAt' | 'statusAP' | 'apId' | 'nomorTagihanAP'>): string => {
+    const id = `posup-${Date.now()}`;
+    const apId = `ap-po-${id}`;
+    const nomorTagihanAP = `AP-${poData.nomorPO}`;
+
+    const newPO: PurchaseOrderSupplier = {
+      ...poData,
+      id,
+      statusAP: 'Belum Lunas',
+      apId,
+      nomorTagihanAP,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedPOs = [newPO, ...poSuppliers];
+    savePOSuppliers(updatedPOs);
+    syncToFirestore('po_suppliers', id, newPO);
+
+    // Otomatis masukkan ke Laporan AP (Hutang Usaha)
+    const newHutang: HutangUsaha = {
+      id: apId,
+      nomorTagihan: nomorTagihanAP,
+      supplier: poData.supplier,
+      tanggal: poData.tanggal,
+      tanggalJatuhTempo: poData.tanggalJatuhTempo,
+      kategori: poData.kategori,
+      keterangan: `PO Supplier ${poData.nomorPO}: ${poData.items.map(i => `${i.namaMaterial} (${i.jumlah} ${i.satuan})`).join(', ')}`,
+      totalTagihan: poData.totalHarga,
+      sudahDibayar: 0,
+      sisaHutang: poData.totalHarga,
+      status: 'Belum Lunas',
+      poSupplierId: id,
+      nomorPO: poData.nomorPO
+    };
+
+    const updatedHutang = [newHutang, ...hutangList];
+    saveHutang(updatedHutang);
+    syncToFirestore('hutang_ap', apId, newHutang);
+
+    return id;
+  };
+
+  const updatePOSupplier = (id: string, poUpdate: Partial<PurchaseOrderSupplier>) => {
+    let updatedItem: PurchaseOrderSupplier | null = null;
+    const updated = poSuppliers.map(item => {
+      if (item.id === id) {
+        updatedItem = { ...item, ...poUpdate };
+        return updatedItem;
+      }
+      return item;
+    });
+    savePOSuppliers(updated);
+    if (updatedItem) syncToFirestore('po_suppliers', id, updatedItem);
+
+    // Sync to Hutang AP
+    if (updatedItem) {
+      const up = updatedItem as PurchaseOrderSupplier;
+      const targetApId = up.apId || `ap-po-${id}`;
+      const existingHutang = hutangList.find(h => h.id === targetApId || h.poSupplierId === id);
+      if (existingHutang) {
+        const nextTotal = up.totalHarga !== undefined ? up.totalHarga : existingHutang.totalTagihan;
+        const nextSisa = Math.max(0, nextTotal - existingHutang.sudahDibayar);
+        const nextStatus: HutangUsaha['status'] = nextSisa === 0 ? 'Lunas' : existingHutang.status;
+        
+        updateHutang(existingHutang.id, {
+          supplier: up.supplier,
+          tanggal: up.tanggal,
+          tanggalJatuhTempo: up.tanggalJatuhTempo,
+          kategori: up.kategori,
+          keterangan: `PO Supplier ${up.nomorPO}: ${up.items.map(i => `${i.namaMaterial} (${i.jumlah} ${i.satuan})`).join(', ')}`,
+          totalTagihan: nextTotal,
+          sisaHutang: nextSisa,
+          status: nextStatus
+        });
+      }
+    }
+  };
+
+  const deletePOSupplier = (id: string) => {
+    const target = poSuppliers.find(p => p.id === id);
+    const updated = poSuppliers.filter(item => item.id !== id);
+    savePOSuppliers(updated);
+    deleteFromFirestore('po_suppliers', id);
+
+    if (target) {
+      const targetApId = target.apId || `ap-po-${id}`;
+      const existingHutang = hutangList.find(h => h.id === targetApId || h.poSupplierId === id);
+      if (existingHutang) {
+        deleteHutang(existingHutang.id);
+      }
+    }
+  };
+
+  const updatePOSupplierStatus = (id: string, status: PurchaseOrderSupplier['statusPO']) => {
+    let updatedItem: PurchaseOrderSupplier | null = null;
+    const updated = poSuppliers.map(item => {
+      if (item.id === id) {
+        updatedItem = { ...item, statusPO: status };
+        return updatedItem;
+      }
+      return item;
+    });
+    savePOSuppliers(updated);
+    if (updatedItem) syncToFirestore('po_suppliers', id, updatedItem);
+  };
+
+  const terimaBarangPOSupplier = (id: string, keterangan?: string): { success: boolean; message: string } => {
+    const po = poSuppliers.find(p => p.id === id);
+    if (!po) return { success: false, message: 'PO Supplier tidak ditemukan' };
+
+    updatePOSupplierStatus(id, 'Diterima Gudang');
+
+    const today = new Date().toISOString().split('T')[0];
+    let updatedMaterialsList = [...materials];
+
+    po.items.forEach(item => {
+      const idx = updatedMaterialsList.findIndex(m => 
+        (item.materialId && m.id === item.materialId) ||
+        (item.kodeMaterial && m.kode?.toLowerCase() === item.kodeMaterial.toLowerCase()) ||
+        m.nama.toLowerCase().trim() === item.namaMaterial.toLowerCase().trim()
+      );
+
+      if (idx !== -1) {
+        const currentMat = updatedMaterialsList[idx];
+        const newStok = currentMat.stok + item.jumlah;
+        const newMasuk = (currentMat.stokMasuk || 0) + item.jumlah;
+        const mutasiEntry: MaterialMutasiItem = {
+          id: `mutmat-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          tanggal: today,
+          nomorBukti: po.nomorPO,
+          tipe: 'MASUK_WAREHOUSE',
+          jumlah: item.jumlah,
+          sisaStokSetelahnya: newStok,
+          pengambil: currentUser?.name || 'Staff Gudang',
+          penyerah: po.supplier,
+          keperluan: `Penerimaan Barang PO Supplier ${po.nomorPO}`,
+          keterangan: keterangan || `Masuk Gudang: ${item.jumlah} ${item.satuan} dari ${po.supplier}`,
+          dicatatOleh: currentUser?.name || 'Admin Sales'
+        };
+
+        const updatedMat: Material = {
+          ...currentMat,
+          stok: newStok,
+          stokMasuk: newMasuk,
+          tanggalMasukWarehouse: today,
+          riwayatMutasi: [mutasiEntry, ...(currentMat.riwayatMutasi || [])],
+          terakhirDiperbarui: new Date().toISOString()
+        };
+
+        updatedMaterialsList[idx] = updatedMat;
+        syncToFirestore('materials', updatedMat.id, updatedMat);
+      }
+    });
+
+    saveMaterials(updatedMaterialsList);
+    return { success: true, message: `Barang dari PO ${po.nomorPO} berhasil diterima di gudang & stok material telah diupdate!` };
+  };
+
   // --- CRUD Customers ---
   const addCustomer = (customer: Omit<Customer, 'id' | 'createdAt'>) => {
     const id = `cust-${Date.now()}`;
@@ -1967,6 +2314,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = hutangList.map(h => (h.id === id ? updatedItem : h));
     saveHutang(updated);
     syncToFirestore('hutang_ap', id, updatedItem);
+
+    // Sync with linked PO Supplier statusAP
+    if (target.poSupplierId) {
+      setPOSuppliers(prev => {
+        const nextPOList = prev.map(po => {
+          if (po.id === target.poSupplierId) {
+            const nextPoStatusAP = nextSisa === 0 ? 'Lunas' : 'Sebagian';
+            const updatedPO = { ...po, statusAP: nextPoStatusAP };
+            syncToFirestore('po_suppliers', po.id, updatedPO);
+            return updatedPO;
+          }
+          return po;
+        });
+        localStorage.setItem('mk_po_suppliers', JSON.stringify(nextPOList));
+        return nextPOList;
+      });
+    }
 
     // Record cashflow expense
     const idKeuangan = `trx-${Date.now()}`;
@@ -2321,6 +2685,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     materials.forEach(m => deleteFromFirestore('materials', m.id));
     finishGoods.forEach(f => deleteFromFirestore('finish_goods', f.id));
     purchaseOrders.forEach(p => deleteFromFirestore('purchase_orders', p.id));
+    poSuppliers.forEach(p => deleteFromFirestore('po_suppliers', p.id));
     suratJalanList.forEach(s => deleteFromFirestore('surat_jalan', s.id));
     keuanganList.forEach(k => deleteFromFirestore('keuangan', k.id));
     customers.forEach(c => deleteFromFirestore('customers', c.id));
@@ -2334,6 +2699,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mk_materials', JSON.stringify([]));
     localStorage.setItem('mk_finish_goods', JSON.stringify([]));
     localStorage.setItem('mk_purchase_orders', JSON.stringify([]));
+    localStorage.setItem('mk_po_suppliers', JSON.stringify([]));
     localStorage.setItem('mk_surat_jalan', JSON.stringify([]));
     localStorage.setItem('mk_keuangan', JSON.stringify([]));
     localStorage.setItem('mk_customers', JSON.stringify([]));
@@ -2347,6 +2713,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMaterials([]);
     setFinishGoods([]);
     setPurchaseOrders([]);
+    setPOSuppliers([]);
     setSuratJalanList([]);
     setKeuanganList([]);
     setCustomers([]);
@@ -2364,6 +2731,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       materials,
       finishGoods,
       purchaseOrders,
+      poSuppliers,
       suratJalanList,
       keuanganList,
       customers,
@@ -2423,6 +2791,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deletePurchaseOrder,
       updatePOStatus,
       updateInvoiceStatus,
+      addPOSupplier,
+      updatePOSupplier,
+      deletePOSupplier,
+      updatePOSupplierStatus,
+      terimaBarangPOSupplier,
       addCustomer,
       updateCustomer,
       deleteCustomer,

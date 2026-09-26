@@ -7,6 +7,7 @@ import { DashboardView } from './components/DashboardView';
 import { MaterialView } from './components/MaterialView';
 import { FinishGoodView } from './components/FinishGoodView';
 import { PurchaseOrderView } from './components/PurchaseOrderView';
+import { SupplierPurchaseOrderView } from './components/SupplierPurchaseOrderView';
 import { SuratJalanView } from './components/SuratJalanView';
 import { KeuanganView } from './components/KeuanganView';
 import { InvoiceBillingView } from './components/InvoiceBillingView';
@@ -50,7 +51,7 @@ function AppContent() {
       // Define tab access limitations to gracefully redirect if role changes or if DASHBOARD is accessed by WAREHOUSE/ADMIN_SALES
       if (role === 'FINANCE' && ['SURAT_JALAN'].includes(activeTab)) {
         setActiveTab('DASHBOARD');
-      } else if (role === 'WAREHOUSE' && (activeTab === 'DASHBOARD' || ['PURCHASE_ORDERS', 'KEUANGAN', 'INVOICE_BILLING', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab))) {
+      } else if (role === 'WAREHOUSE' && (activeTab === 'DASHBOARD' || ['PURCHASE_ORDERS', 'PO_SUPPLIER', 'KEUANGAN', 'INVOICE_BILLING', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab))) {
         setActiveTab('STOK_JADI');
       } else if (role === 'ADMIN_SALES' && (activeTab === 'DASHBOARD' || ['STOK_MATERIAL', 'KEUANGAN', 'LAPORAN_AR', 'LAPORAN_AP', 'KAS_KECIL', 'BUKU_BANK', 'LAPORAN_KEUANGAN', 'ASET_DEPRESIASI', 'LAPORAN_PAJAK'].includes(activeTab))) {
         setActiveTab('PURCHASE_ORDERS');
@@ -73,6 +74,8 @@ function AppContent() {
         return <FinishGoodView />;
       case 'PURCHASE_ORDERS':
         return <PurchaseOrderView />;
+      case 'PO_SUPPLIER':
+        return <SupplierPurchaseOrderView onNavigateTab={setActiveTab} />;
       case 'SURAT_JALAN':
         return <SuratJalanView />;
       case 'INVOICE_BILLING':

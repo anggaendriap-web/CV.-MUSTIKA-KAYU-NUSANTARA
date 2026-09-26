@@ -20,7 +20,8 @@ import {
   Scale,
   Boxes,
   Receipt,
-  Database
+  Database,
+  ShoppingCart
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -54,7 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'DASHBOARD', label: 'Dashboard Rekapan', icon: LayoutDashboard, roles: ['OWNER', 'FINANCE'] },
     { id: 'STOK_MATERIAL', label: 'Stok Material', icon: TreePine, roles: ['OWNER', 'WAREHOUSE', 'FINANCE'], group: 'Operasional' },
     { id: 'STOK_JADI', label: 'Stok Finish Good', icon: Package, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
-    { id: 'PURCHASE_ORDERS', label: 'Purchase Orders', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
+    { id: 'PURCHASE_ORDERS', label: 'PO Pelanggan (Sales)', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
+    { id: 'PO_SUPPLIER', label: 'PO ke Supplier', icon: ShoppingCart, roles: ['OWNER', 'ADMIN_SALES', 'FINANCE'], group: 'Operasional' },
     { id: 'SURAT_JALAN', label: 'Surat Jalan Kirim', icon: Truck, roles: ['OWNER', 'WAREHOUSE', 'ADMIN_SALES'], group: 'Operasional' },
     
     // Modul Finance & Akuntansi

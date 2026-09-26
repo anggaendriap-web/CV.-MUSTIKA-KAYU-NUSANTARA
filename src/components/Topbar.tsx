@@ -27,7 +27,8 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setMobileOpen }) => {
       case 'DASHBOARD': return 'Dashboard Rekapan Pabrik';
       case 'STOK_MATERIAL': return 'Manajemen Stok Material Bahan Baku';
       case 'STOK_JADI': return 'Gudang Penyimpanan Pallet Selesai';
-      case 'PURCHASE_ORDERS': return 'Sistem Purchase Order & Transaksi';
+      case 'PURCHASE_ORDERS': return 'Sistem Purchase Order Pelanggan (Sales)';
+      case 'PO_SUPPLIER': return 'Purchase Order ke Supplier (Pengadaan Bahan Baku)';
       case 'SURAT_JALAN': return 'Ekspedisi & Surat Jalan Kirim';
       case 'INVOICE_BILLING': return 'Billing & Cetak Invoice Pembayaran';
       case 'LAPORAN_AR': return 'Laporan Piutang Usaha Pelanggan (AR)';

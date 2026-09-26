@@ -154,6 +154,47 @@ export interface PurchaseOrder {
   catatan?: string;
 }
 
+export interface POSupplierItem {
+  materialId?: string;
+  kodeMaterial?: string;
+  namaMaterial: string;
+  ukuran?: string;
+  kategori?: string;
+  jumlah: number;
+  satuan: string;
+  hargaSatuan: number;
+  subtotal: number;
+}
+
+export interface PurchaseOrderSupplier {
+  id: string;
+  nomorPO: string; // e.g., PO-SUP/2026/09/001
+  nomorRefSupplier?: string; // e.g. SPH-092/2026
+  supplier: string; // Nama Vendor / Supplier
+  alamatSupplier?: string;
+  teleponSupplier?: string;
+  picSupplier?: string;
+  tanggal: string; // Tanggal order
+  tanggalPengiriman?: string; // Tanggal estimasi tiba di pabrik
+  syaratPembayaran: SyaratPembayaran; // COD, CBD, Tempo 7 Hari, Tempo 14 Hari, Tempo 30 Hari
+  tanggalJatuhTempo: string;
+  kategori: 'Bahan Baku Kayu' | 'Paku & Besi' | 'Sewa / Perbaikan Mesin' | 'Solar & Bahan Bakar' | 'Lainnya';
+  items: POSupplierItem[];
+  subtotal: number;
+  tipePajak?: 'Non PPN' | 'PPN 11%' | 'PPh 23' | 'PPN & PPh';
+  ppnNominal?: number;
+  pphNominal?: number;
+  biayaKirim?: number;
+  totalHarga: number;
+  statusPO: 'Draf' | 'Disetujui' | 'Dikirim Supplier' | 'Diterima Gudang' | 'Selesai' | 'Dibatalkan';
+  statusAP: 'Belum Lunas' | 'Sebagian' | 'Lunas';
+  apId?: string; // Link ID to HutangUsaha (Laporan AP)
+  nomorTagihanAP?: string; // e.g. AP-PO-SUP/2026/09/001
+  catatan?: string;
+  dibuatOleh: string; // Admin Sales / User
+  createdAt: string;
+}
+
 export interface Customer {
   id: string;
   nama: string;
@@ -223,6 +264,8 @@ export interface HutangUsaha {
     metode: string;
     catatan?: string;
   }[];
+  poSupplierId?: string; // ID Purchase Order Supplier (jika berasal dari PO)
+  nomorPO?: string; // Nomor PO Supplier referensi
 }
 
 export interface KasKecilItem {
