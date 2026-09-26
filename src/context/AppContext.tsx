@@ -19,7 +19,8 @@ import {
   FinishGoodMutasiItem,
   PurchaseOrderSupplier,
   POSupplierItem,
-  Supplier
+  Supplier,
+  ManualAR
 } from '../types';
 import { db, doc, collection, onSnapshot, setDoc, deleteDoc, getDocFromServer } from '../firebase';
 import { calculateDueDateFromInvoice } from '../utils/paymentTerms';
@@ -39,6 +40,7 @@ interface AppContextProps {
   bukuBankList: BukuBankItem[];
   asetList: AsetTetap[];
   pajakList: PajakItem[];
+  manualARList: ManualAR[];
   tandaTerimaMaterialList: TandaTerimaPengambilanMaterial[];
   currentUser: User | null;
   darkMode: boolean;
@@ -181,6 +183,11 @@ interface AppContextProps {
   addPajak: (pajak: Omit<PajakItem, 'id'>) => void;
   updatePajak: (id: string, pajak: Partial<PajakItem>) => void;
   deletePajak: (id: string) => void;
+
+  // Manual AR actions
+  addManualAR: (ar: Omit<ManualAR, 'id' | 'createdAt'>) => string;
+  updateManualAR: (id: string, ar: Partial<ManualAR>) => void;
+  deleteManualAR: (id: string) => void;
 
   // Reset database action
   resetDatabase: () => void;
@@ -596,6 +603,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(cached) as PajakItem[];
         return parsed.filter(p => !deletedDocIdsRef.current.has(p.id));
+      } catch { return []; }
+    }
+    return [];
+  });
+
+  const [manualARList, setManualARList] = useState<ManualAR[]>(() => {
+    const cached = localStorage.getItem('mk_manual_ar');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as ManualAR[];
+        return parsed.filter(m => !deletedDocIdsRef.current.has(m.id));
       } catch { return []; }
     }
     return [];
@@ -1211,6 +1229,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const savePajak = (newPajak: PajakItem[]) => {
     setPajakList(newPajak);
     localStorage.setItem('mk_laporan_pajak', JSON.stringify(newPajak));
+  };
+
+  const saveManualAR = (newAR: ManualAR[]) => {
+    setManualARList(newAR);
+    localStorage.setItem('mk_manual_ar', JSON.stringify(newAR));
   };
 
   // Auth & Password Operations
@@ -2765,6 +2788,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // --- CRUD Manual AR ---
+  const addManualAR = (ar: Omit<ManualAR, 'id' | 'createdAt'>): string => {
+    const id = `ar-man-${Date.now()}`;
+    const newEntry: ManualAR = {
+      ...ar,
+      id,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newEntry, ...manualARList];
+    saveManualAR(updated);
+    syncToFirestore('manual_ar', id, newEntry);
+    return id;
+  };
+
+  const updateManualAR = (id: string, ar: Partial<ManualAR>) => {
+    let updatedItem: ManualAR | null = null;
+    const updated = manualARList.map(item => {
+      if (item.id === id) {
+        updatedItem = {
+          ...item,
+          ...ar
+        };
+        return updatedItem;
+      }
+      return item;
+    });
+    saveManualAR(updated);
+    if (updatedItem) syncToFirestore('manual_ar', id, updatedItem);
+  };
+
+  const deleteManualAR = (id: string) => {
+    const cleanId = String(id || '').trim();
+    if (!cleanId) return;
+    const updated = manualARList.filter(item => item.id !== cleanId);
+    saveManualAR(updated);
+    deleteFromFirestore('manual_ar', cleanId);
+  };
+
   const updateSaldoAwalKasKecil = (val: number) => {
     setSaldoAwalKasKecil(val);
     localStorage.setItem('mk_saldo_awal_kas_kecil', String(val));
@@ -3057,6 +3118,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatePajak,
       deletePajak,
       deletedTaxIds,
+      manualARList,
+      addManualAR,
+      updateManualAR,
+      deleteManualAR,
       resetDatabase
     }}>
       {children}

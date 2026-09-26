@@ -229,7 +229,8 @@ export interface Supplier {
 export interface MarketingCommission {
   id: string;
   namaMarketing: string;
-  persentaseKomisi: number; // e.g., 2%
+  persentaseKomisi?: number; // e.g., 2% (optional legacy)
+  komisiPerPcs: number; // Nominal komisi per pcs (input by Admin Sales)
   targetOmset?: number;
 }
 
@@ -348,5 +349,19 @@ export interface PajakItem {
   statusBayarLapor: 'Belum Lapor' | 'Sudah Lapor SPT' | 'Lunas Bayar';
   masaPajak: string; // e.g. Agustus 2026
   keterangan?: string;
+}
+
+export interface ManualAR {
+  id: string;
+  nomorReferensi: string; // e.g. AR-MANUAL/2026/09/001
+  pelanggan: string;
+  tanggal: string;
+  jatuhTempo: string;
+  totalPiutang: number;
+  sudahDibayar?: number;
+  statusInvoice: 'Belum Lunas' | 'Sebagian' | 'Lunas';
+  keterangan: string;
+  dibuatOleh?: string;
+  createdAt?: string;
 }
 

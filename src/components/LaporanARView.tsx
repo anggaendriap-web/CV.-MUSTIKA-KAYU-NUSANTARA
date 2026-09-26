@@ -14,11 +14,12 @@ import {
   Building2, 
   TrendingUp, 
   X,
+  Plus,
   FileSpreadsheet
 } from 'lucide-react';
 
 export const LaporanARView: React.FC = () => {
-  const { purchaseOrders, updateInvoiceStatus, currentUser } = useApp();
+  const { purchaseOrders, manualARList, addManualAR, updateManualAR, deleteManualAR, updateInvoiceStatus, currentUser } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [customerFilter, setCustomerFilter] = useState('Semua');
@@ -26,6 +27,15 @@ export const LaporanARView: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showAddManualModal, setShowAddManualModal] = useState(false);
+
+  // Form Manual AR state
+  const [newPelanggan, setNewPelanggan] = useState('');
+  const [newNoRef, setNewNoRef] = useState('');
+  const [newTanggal, setNewTanggal] = useState(new Date().toISOString().split('T')[0]);
+  const [newJatuhTempo, setNewJatuhTempo] = useState('');
+  const [newTotalPiutang, setNewTotalPiutang] = useState('');
+  const [newKeterangan, setNewKeterangan] = useState('');
 
   // Initialize dates
   React.useEffect(() => {
@@ -40,15 +50,14 @@ export const LaporanARView: React.FC = () => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
   };
 
-  // Calculate Aging & Due Dates
+  // Calculate Aging & Due Dates for POs and Manual AR
   const arItems = useMemo(() => {
     const today = new Date();
-    return purchaseOrders
+
+    const poItems = purchaseOrders
       .filter(po => po.statusInvoice !== 'Lunas')
       .map(po => {
-        // Use po.tanggal instead of po.tanggalOrder
         const orderDate = new Date(po.tanggal || new Date().toISOString());
-        // Default terms 30 days
         const dueDate = new Date(orderDate);
         dueDate.setDate(dueDate.getDate() + 30);
         
@@ -66,14 +75,61 @@ export const LaporanARView: React.FC = () => {
         }
 
         return {
-          ...po,
+          id: po.id,
+          isManual: false,
+          pelanggan: po.pelanggan,
+          nomorPO: po.nomorPO,
+          nomorInvoice: po.nomorInvoice || po.nomorPO,
+          tanggalOrder: po.tanggal || po.tanggalOrder || '',
           dueDateStr: dueDate.toISOString().split('T')[0],
           overdueDays,
           agingCategory,
-          sisaPiutang: po.totalHarga // if partial not tracked, full is receivable
+          sisaPiutang: po.totalHarga,
+          tujuanPengiriman: po.tujuanPengiriman || 'Pengiriman Buyer'
         };
       });
-  }, [purchaseOrders]);
+
+    const manualItems = manualARList
+      .filter(m => m.statusInvoice !== 'Lunas')
+      .map(m => {
+        const orderDate = new Date(m.tanggal || new Date().toISOString());
+        const dueDate = new Date(m.jatuhTempo || orderDate);
+        if (!m.jatuhTempo) {
+          dueDate.setDate(dueDate.getDate() + 30);
+        }
+
+        const diffTime = today.getTime() - dueDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const overdueDays = Math.max(0, diffDays);
+
+        let agingCategory: 'Lancar (0-30 hari)' | 'Jatuh Tempo (31-60 hari)' | 'Kritis (>60 hari)';
+        if (overdueDays <= 0) {
+          agingCategory = 'Lancar (0-30 hari)';
+        } else if (overdueDays <= 30) {
+          agingCategory = 'Jatuh Tempo (31-60 hari)';
+        } else {
+          agingCategory = 'Kritis (>60 hari)';
+        }
+
+        const sisa = (m.totalPiutang || 0) - (m.sudahDibayar || 0);
+
+        return {
+          id: m.id,
+          isManual: true,
+          pelanggan: m.pelanggan,
+          nomorPO: m.nomorReferensi,
+          nomorInvoice: m.nomorReferensi,
+          tanggalOrder: m.tanggal,
+          dueDateStr: dueDate.toISOString().split('T')[0],
+          overdueDays,
+          agingCategory,
+          sisaPiutang: sisa > 0 ? sisa : m.totalPiutang,
+          tujuanPengiriman: m.keterangan || 'AR Manual / Non-PO'
+        };
+      });
+
+    return [...poItems, ...manualItems];
+  }, [purchaseOrders, manualARList]);
 
   // Filtered AR
   const filteredAR = useMemo(() => {
@@ -91,8 +147,8 @@ export const LaporanARView: React.FC = () => {
       if (agingFilter === '>60') matchesAging = item.agingCategory === 'Kritis (>60 hari)';
 
       let matchesDate = true;
-      if (startDate) matchesDate = matchesDate && (item.tanggal || '') >= startDate;
-      if (endDate) matchesDate = matchesDate && (item.tanggal || '') <= endDate;
+      if (startDate) matchesDate = matchesDate && (item.tanggalOrder || '') >= startDate;
+      if (endDate) matchesDate = matchesDate && (item.tanggalOrder || '') <= endDate;
 
       return matchesSearch && matchesCust && matchesAging && matchesDate;
     });
@@ -105,8 +161,33 @@ export const LaporanARView: React.FC = () => {
   const piutangKritis = useMemo(() => arItems.filter(i => i.agingCategory === 'Kritis (>60 hari)').reduce((a, b) => a + b.sisaPiutang, 0), [arItems]);
 
   const uniqueCustomers = useMemo(() => {
-    return Array.from(new Set(purchaseOrders.map(p => p.pelanggan)));
-  }, [purchaseOrders]);
+    const custs = [...purchaseOrders.map(p => p.pelanggan), ...manualARList.map(m => m.pelanggan)];
+    return Array.from(new Set(custs));
+  }, [purchaseOrders, manualARList]);
+
+  const handleSaveManualAR = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPelanggan.trim() || !newTotalPiutang || Number(newTotalPiutang) <= 0) {
+      alert('Mohon isi nama pelanggan dan nominal piutang yang valid!');
+      return;
+    }
+    addManualAR({
+      pelanggan: newPelanggan.trim(),
+      nomorReferensi: newNoRef.trim() || `AR-MAN-${Math.floor(1000 + Math.random() * 9000)}`,
+      tanggal: newTanggal,
+      jatuhTempo: newJatuhTempo || newTanggal,
+      totalPiutang: Number(newTotalPiutang),
+      sudahDibayar: 0,
+      statusInvoice: 'Belum Lunas',
+      keterangan: newKeterangan.trim() || 'Piutang Manual / Non-PO Customer',
+      dibuatOleh: currentUser?.name || 'Finance'
+    });
+    setNewPelanggan('');
+    setNewNoRef('');
+    setNewTotalPiutang('');
+    setNewKeterangan('');
+    setShowAddManualModal(false);
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -122,13 +203,22 @@ export const LaporanARView: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowPrintModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
-        >
-          <Printer className="h-4 w-4" />
-          <span>Cetak Laporan AR PDF</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowAddManualModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Tambah AR Manual</span>
+          </button>
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Cetak Laporan AR PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Aging Metric Cards */}
@@ -215,7 +305,7 @@ export const LaporanARView: React.FC = () => {
             <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 font-bold border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <th className="p-3.5">Pelanggan</th>
-                <th className="p-3.5">No. Invoice & PO</th>
+                <th className="p-3.5">No. Invoice & PO / Ref</th>
                 <th className="p-3.5">Tgl Faktur</th>
                 <th className="p-3.5">Jatuh Tempo</th>
                 <th className="p-3.5 text-center">Umur Piutang</th>
@@ -234,12 +324,17 @@ export const LaporanARView: React.FC = () => {
                 filteredAR.map((item) => (
                   <tr key={item.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
                     <td className="p-3.5">
-                      <span className="font-bold text-zinc-900 dark:text-white block">{item.pelanggan}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-zinc-900 dark:text-white">{item.pelanggan}</span>
+                        {item.isManual && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[9px] font-bold rounded">Manual</span>
+                        )}
+                      </div>
                       <span className="text-[11px] text-zinc-400">{item.tujuanPengiriman}</span>
                     </td>
                     <td className="p-3.5">
                       <span className="font-semibold text-red-700 dark:text-red-400 block">{item.nomorInvoice || item.nomorPO}</span>
-                      <span className="text-[11px] text-zinc-400">PO: {item.nomorPO}</span>
+                      <span className="text-[11px] text-zinc-400">{item.isManual ? 'Ref: Manual AR' : `PO: ${item.nomorPO}`}</span>
                     </td>
                     <td className="p-3.5 text-zinc-600 dark:text-zinc-300">{item.tanggalOrder}</td>
                     <td className="p-3.5 text-zinc-600 dark:text-zinc-300 font-medium">{item.dueDateStr}</td>
@@ -258,12 +353,30 @@ export const LaporanARView: React.FC = () => {
                       {formatRupiah(item.sisaPiutang)}
                     </td>
                     <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => updateInvoiceStatus(item.id, 'Lunas')}
-                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer"
-                      >
-                        Pelunasan
-                      </button>
+                      {item.isManual ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => updateManualAR(item.id, { statusInvoice: 'Lunas', sudahDibayar: item.sisaPiutang })}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                          >
+                            Pelunasan
+                          </button>
+                          <button
+                            onClick={() => deleteManualAR(item.id)}
+                            className="p-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                            title="Hapus AR Manual"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => updateInvoiceStatus(item.id, 'Lunas')}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                        >
+                          Pelunasan
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -272,6 +385,114 @@ export const LaporanARView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Add Manual AR Modal */}
+      {showAddManualModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-lg w-full border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden">
+            <div className="p-4 bg-blue-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-blue-300" />
+                <span className="font-bold text-sm">Tambah Piutang Usaha (AR) Manual</span>
+              </div>
+              <button
+                onClick={() => setShowAddManualModal(false)}
+                className="p-1.5 hover:bg-blue-800 text-blue-200 hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveManualAR} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Nama Customer / Pelanggan *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: PT. Sukses Makmur / Toko Kayu Sejahtera"
+                  value={newPelanggan}
+                  onChange={(e) => setNewPelanggan(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">No. Invoice / Referensi</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: INV-MAN-001"
+                    value={newNoRef}
+                    onChange={(e) => setNewNoRef(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Total Nominal Piutang (Rp) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="Contoh: 15000000"
+                    value={newTotalPiutang}
+                    onChange={(e) => setNewTotalPiutang(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Tanggal Faktur</label>
+                  <input
+                    type="date"
+                    required
+                    value={newTanggal}
+                    onChange={(e) => setNewTanggal(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Tanggal Jatuh Tempo</label>
+                  <input
+                    type="date"
+                    value={newJatuhTempo}
+                    onChange={(e) => setNewJatuhTempo(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">Keterangan / Catatan</label>
+                <textarea
+                  rows={2}
+                  placeholder="Keterangan tambahan transaksi piutang..."
+                  value={newKeterangan}
+                  onChange={(e) => setNewKeterangan(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddManualModal(false)}
+                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  Simpan AR Manual
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* AR Print PDF Modal */}
       {showPrintModal && (
@@ -308,7 +529,7 @@ export const LaporanARView: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <CompanyLogo size="md" className="h-10 w-10" />
                     <div>
-                      <h2 className="text-lg font-black text-red-900">PT MUSTIKA KAYU NUSANTARA</h2>
+                      <h2 className="text-lg font-black text-red-900">CV. MUSTIKA KAYU NUSANTARA</h2>
                       <p className="text-[10px] text-zinc-600">Laporan Umur Piutang Usaha (Accounts Receivable Aging Report)</p>
                     </div>
                   </div>
@@ -341,7 +562,7 @@ export const LaporanARView: React.FC = () => {
                   <thead>
                     <tr className="bg-red-900 text-white font-bold">
                       <th className="p-2 text-left">Pelanggan</th>
-                      <th className="p-2 text-left">No. Invoice</th>
+                      <th className="p-2 text-left">No. Invoice / Ref</th>
                       <th className="p-2 text-left">Tgl Faktur</th>
                       <th className="p-2 text-left">Jatuh Tempo</th>
                       <th className="p-2 text-center">Status Umur</th>
@@ -351,7 +572,9 @@ export const LaporanARView: React.FC = () => {
                   <tbody className="divide-y divide-zinc-200 border-b border-zinc-200">
                     {filteredAR.map((item, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
-                        <td className="p-2 font-bold">{item.pelanggan}</td>
+                        <td className="p-2 font-bold">
+                          {item.pelanggan} {item.isManual && <span className="text-[9px] text-blue-700 font-normal">(Manual)</span>}
+                        </td>
                         <td className="p-2 text-red-900">{item.nomorInvoice || item.nomorPO}</td>
                         <td className="p-2">{item.tanggalOrder}</td>
                         <td className="p-2">{item.dueDateStr}</td>

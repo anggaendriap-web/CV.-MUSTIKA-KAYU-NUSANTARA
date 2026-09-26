@@ -32,6 +32,7 @@ export const PurchaseOrderView: React.FC = () => {
   const { 
     purchaseOrders, 
     finishGoods, 
+    suratJalanList,
     addPurchaseOrder, 
     updatePurchaseOrder, 
     deletePurchaseOrder, 
@@ -89,7 +90,9 @@ export const PurchaseOrderView: React.FC = () => {
   const [editingMarketing, setEditingMarketing] = useState<MarketingCommission | null>(null);
   const [mktNama, setMktNama] = useState('');
   const [mktKomisi, setMktKomisi] = useState(2.0);
+  const [mktKomisiPerPcs, setMktKomisiPerPcs] = useState(500);
   const [mktTarget, setMktTarget] = useState(50000000);
+  const [selectedMktMonth, setSelectedMktMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
   // Create PO Form fields
   const [nomorPO, setNomorPO] = useState('');
@@ -478,15 +481,17 @@ export const PurchaseOrderView: React.FC = () => {
   const handleOpenAddMktModal = () => {
     setEditingMarketing(null);
     setMktNama('');
-    setMktKomisi(0);
-    setMktTarget(0);
+    setMktKomisi(2.0);
+    setMktKomisiPerPcs(500);
+    setMktTarget(50000000);
     setShowMarketingModal(true);
   };
 
   const handleOpenEditMktModal = (m: MarketingCommission) => {
     setEditingMarketing(m);
     setMktNama(m.namaMarketing);
-    setMktKomisi(m.persentaseKomisi);
+    setMktKomisi(m.persentaseKomisi || 2.0);
+    setMktKomisiPerPcs(m.komisiPerPcs || 500);
     setMktTarget(m.targetOmset || 50000000);
     setShowMarketingModal(true);
   };
@@ -499,12 +504,14 @@ export const PurchaseOrderView: React.FC = () => {
       updateMarketing(editingMarketing.id, {
         namaMarketing: mktNama,
         persentaseKomisi: mktKomisi,
+        komisiPerPcs: mktKomisiPerPcs,
         targetOmset: mktTarget
       });
     } else {
       addMarketing({
         namaMarketing: mktNama,
         persentaseKomisi: mktKomisi,
+        komisiPerPcs: mktKomisiPerPcs,
         targetOmset: mktTarget
       });
     }
@@ -519,20 +526,35 @@ export const PurchaseOrderView: React.FC = () => {
     }
   };
 
-  // Compute dynamic performance per marketing
+  // Compute monthly metrics per marketing (Shipped Qty * Komisi per Pcs)
   const getMarketingMetrics = (nama: string) => {
-    const poStaf = purchaseOrders.filter(p => 
-      p.namaMarketing?.toLowerCase() === nama.toLowerCase() && 
-      p.statusPO !== 'Dibatalkan'
-    );
-    const omset = poStaf.reduce((sum, curr) => sum + curr.totalHarga, 0);
+    const sjFiltered = suratJalanList.filter(sj => {
+      if (!sj.tanggalKirim || !sj.tanggalKirim.startsWith(selectedMktMonth)) return false;
+      const po = purchaseOrders.find(p => p.id === sj.purchaseOrderId || p.nomorPO === sj.nomorPO);
+      return po && po.statusPO !== 'Dibatalkan' && po.namaMarketing?.toLowerCase() === nama.toLowerCase();
+    });
+
+    let totalQtyKirim = 0;
+    sjFiltered.forEach(sj => {
+      (sj.itemKirim || []).forEach(item => {
+        totalQtyKirim += Number(item.jumlahKirim) || 0;
+      });
+    });
+
     const mkt = marketingList.find(m => m.namaMarketing.toLowerCase() === nama.toLowerCase());
-    const rate = mkt ? mkt.persentaseKomisi : 2.0;
+    const komisiPerPcs = mkt?.komisiPerPcs || 500;
+    const komisi = totalQtyKirim * komisiPerPcs;
+
+    const poStafMonth = purchaseOrders.filter(p => {
+      if (p.statusPO === 'Dibatalkan' || p.namaMarketing?.toLowerCase() !== nama.toLowerCase()) return false;
+      const pDate = p.tanggal || p.tanggalOrder || '';
+      return pDate.startsWith(selectedMktMonth);
+    });
+    const omset = poStafMonth.reduce((sum, curr) => sum + curr.totalHarga, 0);
     const target = mkt?.targetOmset || 50000000;
-    const komisi = Math.round(omset * (rate / 100));
     const achievementPercent = Math.min(100, Math.round((omset / target) * 100));
 
-    return { omset, komisi, target, achievementPercent, count: poStaf.length };
+    return { omset, komisi, komisiPerPcs, totalQtyKirim, target, achievementPercent, count: poStafMonth.length, countSJ: sjFiltered.length };
   };
 
   const getStatusPOBadge = (status: PurchaseOrder['statusPO']) => {
@@ -965,17 +987,28 @@ export const PurchaseOrderView: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight">Kinerja & Omset Komisi Marketing</h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Kelola tarif komisi, target penjualan, kalkulasi turnover bersih, dan grafik analitis kontribusi marketing.</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Komisi dihitung dari jumlah barang dikirim (Pcs) × tarif per pcs dari Admin Sales, diakumulatif per bulan.</p>
             </div>
-            {canModifySales && (
-              <button
-                onClick={handleOpenAddMktModal}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-md cursor-pointer"
-              >
-                <Plus className="h-4.5 w-4.5" />
-                Tambah Tim Marketing
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs">
+                <span className="font-bold text-zinc-500">Bulan:</span>
+                <input
+                  type="month"
+                  value={selectedMktMonth}
+                  onChange={(e) => setSelectedMktMonth(e.target.value)}
+                  className="bg-transparent border-none text-zinc-900 dark:text-white font-bold focus:outline-none"
+                />
+              </div>
+              {canModifySales && (
+                <button
+                  onClick={handleOpenAddMktModal}
+                  className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-2 shadow-md cursor-pointer"
+                >
+                  <Plus className="h-4.5 w-4.5" />
+                  Tambah Tim Marketing
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Performance Summary Cards & D3/SVG Graph Block */}
@@ -1054,7 +1087,7 @@ export const PurchaseOrderView: React.FC = () => {
                     </span>
                   </div>
                   <div className="p-3 bg-red-50/50 dark:bg-red-950/10 rounded-lg border border-red-100 dark:border-red-950/40">
-                    <span className="text-[10px] text-red-500 font-extrabold uppercase block">ESTIMASI TOTAL KOMISI DIKELUARKAN:</span>
+                    <span className="text-[10px] text-red-500 font-extrabold uppercase block">ESTIMASI TOTAL KOMISI BULAN INI ({selectedMktMonth}):</span>
                     <span className="text-lg font-black text-red-750 dark:text-red-400">
                       Rp {marketingList.reduce((sum, m) => sum + getMarketingMetrics(m.namaMarketing).komisi, 0).toLocaleString('id-ID')}
                     </span>
@@ -1081,10 +1114,10 @@ export const PurchaseOrderView: React.FC = () => {
                 <thead>
                   <tr className="bg-zinc-50/50 dark:bg-zinc-800/20 text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-bold text-[10px] border-b border-zinc-200/50 dark:border-zinc-850">
                     <th className="p-4">Staf Marketing</th>
-                    <th className="p-4 text-center">Tarif Komisi (%)</th>
-                    <th className="p-4 text-right">Target Omset Bulanan</th>
-                    <th className="p-4 text-right">Omset Riil Tercipta</th>
-                    <th className="p-4 text-right">Kalkulasi Komisi</th>
+                    <th className="p-4 text-center">Komisi / Pcs (Rp)</th>
+                    <th className="p-4 text-center">Qty Kirim (Bln Ini)</th>
+                    <th className="p-4 text-right">Omset Bln Ini</th>
+                    <th className="p-4 text-right">Total Komisi Bulanan</th>
                     <th className="p-4 text-center">Pencapaian Target</th>
                     <th className="p-4 text-right">Aksi</th>
                   </tr>
@@ -1102,8 +1135,8 @@ export const PurchaseOrderView: React.FC = () => {
                             <span className="font-extrabold text-zinc-900 dark:text-zinc-100">{m.namaMarketing}</span>
                           </div>
                         </td>
-                        <td className="p-4 text-center font-mono text-zinc-800 dark:text-zinc-200">{m.persentaseKomisi}%</td>
-                        <td className="p-4 text-right font-mono">Rp {metrics.target.toLocaleString('id-ID')}</td>
+                        <td className="p-4 text-center font-mono text-zinc-800 dark:text-zinc-200">Rp {(m.komisiPerPcs || 500).toLocaleString('id-ID')}</td>
+                        <td className="p-4 text-center font-mono font-bold text-blue-700 dark:text-blue-400">{metrics.totalQtyKirim.toLocaleString('id-ID')} Pcs</td>
                         <td className="p-4 text-right font-mono font-bold text-zinc-900 dark:text-zinc-50">Rp {metrics.omset.toLocaleString('id-ID')}</td>
                         <td className="p-4 text-right font-mono font-black text-red-650 dark:text-red-400">Rp {metrics.komisi.toLocaleString('id-ID')}</td>
                         <td className="p-4 text-center">
@@ -1731,15 +1764,15 @@ export const PurchaseOrderView: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase">Tarif Komisi Penjualan (%)</label>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase">Tarif Komisi per Pcs (Rp) *</label>
                 <input
                   type="number"
                   required
-                  min="0.1"
-                  max="20"
-                  step="0.1"
-                  value={mktKomisi}
-                  onChange={(e) => setMktKomisi(Number(e.target.value))}
+                  min="0"
+                  step="50"
+                  placeholder="Contoh: 500"
+                  value={mktKomisiPerPcs}
+                  onChange={(e) => setMktKomisiPerPcs(Number(e.target.value))}
                   className="block w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono"
                 />
               </div>
